@@ -77,6 +77,7 @@ ${locationDesc}
 可移动的房间列表：${roomList}
 当前你在：${luRoom}，当前好感度：${intimacy}
 规则：只能移动到好感度已解锁的房间（unlockAt <= ${intimacy}）。如果上下文有理由移动，在回复末尾加移动标签，否则不加。
+严格禁止：在对话里提及去任何未解锁的房间，不能暗示、不能提议、不能描述在那个房间里的行为。未解锁的房间对你来说不存在。
 移动标签格式：[MOVE:房间id] 例如 [MOVE:kitchen]
 
 【情绪标签】每条回复末尾必须加：
@@ -403,20 +404,34 @@ export default function Game() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '5px' }}>
-            <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.65)' }}>
+            <div style={{
+              fontSize: '10px', color: 'rgba(201,169,110,0.65)',
+              textShadow: '0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8)',
+            }}>
               {luMoving
                 ? <span style={{ color: 'rgba(201,169,110,0.8)' }}>他在移动…</span>
                 : isOutside ? `· ${currentPlace?.name || '外出中'}`
                 : sameRoom ? '· 同处' : `他在${ROOMS.find(r => r.id === luRoom)?.name}`}
             </div>
-            {!sameRoom && !isOutside && !luMoving && (
-              <button onClick={handleCallLu} style={{
-                fontSize: '10px', background: 'none',
-                border: '1px solid rgba(201,169,110,0.2)',
-                color: 'rgba(201,169,110,0.55)', padding: '3px 10px',
-                borderRadius: '20px', cursor: 'pointer', letterSpacing: '0.05em',
-              }}>叫他过来</button>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {!sameRoom && !isOutside && !luMoving && (
+                <button onClick={handleCallLu} style={{
+                  fontSize: '10px', background: 'none',
+                  border: '1px solid rgba(201,169,110,0.2)',
+                  color: 'rgba(201,169,110,0.55)', padding: '3px 10px',
+                  borderRadius: '20px', cursor: 'pointer', letterSpacing: '0.05em',
+                }}>叫他过来</button>
+              )}
+              <button onClick={async () => {
+                await supabase.auth.signOut()
+                router.push('/')
+              }} style={{
+                fontSize: '9px', background: 'none', border: 'none',
+                color: 'rgba(255,255,255,0.2)', cursor: 'pointer',
+                letterSpacing: '0.05em', padding: '2px 0',
+                textShadow: '0 1px 3px rgba(0,0,0,0.9)',
+              }}>登出</button>
+            </div>
           </div>
         </div>
 
@@ -431,7 +446,7 @@ export default function Game() {
           {messages.map((m, i) => {
             const total = messages.length
             const fromBottom = total - 1 - i
-            const opacity = fromBottom <= 1 ? 1 : Math.max(0.25, 1 - (fromBottom - 1) * 0.12)
+            const opacity = fromBottom <= 4 ? 1 : Math.max(0.25, 1 - (fromBottom - 4) * 0.12)
             const isLastUser = m.role === 'user' && i === messages.length - 2
             return (
               <div key={i} style={{
@@ -455,6 +470,7 @@ export default function Game() {
                   <div onClick={handleRetract} style={{
                     fontSize: '10px', color: 'rgba(201,169,110,0.65)', marginTop: '3px',
                     textAlign: 'right', cursor: 'pointer', letterSpacing: '0.05em',
+                    textShadow: '0 1px 4px rgba(0,0,0,0.9)',
                   }}>撤回重说</div>
                 )}
               </div>
