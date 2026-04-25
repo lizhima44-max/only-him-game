@@ -191,8 +191,6 @@ function handleCallLu() {
   }
 }
 
-const [toast, setToast] = useState('')
-
 useEffect(() => {
   if (!toast) return
   const t = setTimeout(() => setToast(''), 3000)
