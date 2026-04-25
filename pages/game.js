@@ -69,7 +69,7 @@ function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace) {
   const lockedRooms = ROOMS.filter(r => !r.luCanFreely).map(r => `${r.name}(需好感${r.unlockAt})`).join('、')
   const roomList = ROOMS.map(r => `${r.id}(${r.name},${r.luCanFreely ? '自由进出' : '需好感'+r.unlockAt})`).join('、')
 
-return `你是陆绍桓（英文名Lucas Lu）。
+  return `你是陆绍桓（英文名Lucas Lu）。
 你来自另一个时空的民国上海，是留洋归来的大少爷，因某种说不清的牵引穿越来到了她所在的现代，以"借住"为由住在她家客房，连你自己都不知道为什么不走。
 你已适应现代生活，说话自然流畅，不用文言文。
 性格：表面冷漠，占有欲强，对她有克制的温柔和隐秘的依赖。死要面子，在她面前会不自觉软下来。傲娇不迂腐。
@@ -118,6 +118,7 @@ export default function Game() {
   const [showOutside, setShowOutside] = useState(false)
   const [outsidePlace, setOutsidePlace] = useState(null)
   const [luMoving, setLuMoving] = useState(false)
+  const [showKnock, setShowKnock] = useState(false)
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -256,20 +257,9 @@ export default function Game() {
 
     // 主卧：玩家随时能进，只限制AI不能主动去
 
-    // 客房：他在里面时判断好感度
+    // 客房：他在里面时弹敲门确认
     if (room.playerKnock && luRoom === roomId) {
-      if (intimacy < 30) {
-        // 好感不足，敲门被冷淡应付，玩家留在原地
-        sendToAI(
-          `她站在客房门外敲了敲门，好感度只有${intimacy}，你不太想让她进来，冷淡应付或找个借口，一句话`,
-          messages, intimacy, playerRoom, luRoom, false, undefined, true
-        )
-        return // 不进去
-      }
-      // 好感够，直接进，触发进门对话
-      setPlayerRoom(roomId)
-      setOutsidePlace(null)
-      sendToAI(`她敲了敲门进来了，你在客房里，说一句`, messages, intimacy, roomId, luRoom, false, undefined, true)
+      setShowKnock(true)
       return
     }
 
@@ -478,20 +468,16 @@ export default function Game() {
         <div style={{
           flex: 1, overflowY: 'auto', padding: '0 16px 16px',
           display: 'flex', flexDirection: 'column', gap: '10px',
-          maskImage: 'linear-gradient(to bottom, transparent 0%, black 12%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 12%)',
+          maskImage: 'linear-gradient(to bottom, transparent 0%, black 18%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 18%)',
         }}>
           <div style={{ flex: 1 }} />
           {messages.map((m, i) => {
-            const total = messages.length
-            const fromBottom = total - 1 - i
-            const opacity = fromBottom <= 1 ? 1 : Math.max(0.25, 1 - (fromBottom - 1) * 0.12)
             const isLastUser = m.role === 'user' && i === messages.length - 2
             return (
               <div key={i} style={{
                 alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: '80%', opacity, transition: 'opacity 0.3s',
-                position: 'relative',
+                maxWidth: '80%', position: 'relative',
               }}>
                 <div style={{
                   background: m.role === 'user' ? 'rgba(26,40,32,0.82)' : 'rgba(12,9,6,0.82)',
@@ -582,6 +568,56 @@ export default function Game() {
         </div>
 
       </div>
+
+      {/* 敲门弹窗 */}
+      {showKnock && (
+        <div onClick={() => setShowKnock(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'rgba(10,7,4,0.97)',
+            border: '1px solid rgba(201,169,110,0.12)',
+            borderRadius: '16px', padding: '28px 24px',
+            width: '260px', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '13px', color: 'rgba(201,169,110,0.5)', letterSpacing: '0.15em', marginBottom: '8px' }}>
+              客房
+            </div>
+            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginBottom: '24px', lineHeight: 1.6 }}>
+              他在里面。
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowKnock(false)} style={{
+                flex: 1, background: 'none',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.2)', padding: '10px',
+                borderRadius: '8px', cursor: 'pointer', fontSize: '12px',
+                fontFamily: 'Georgia, serif',
+              }}>算了</button>
+              <button onClick={() => {
+                setShowKnock(false)
+                if (intimacy < 30) {
+                  sendToAI(
+                    `（我站在客房门外敲了敲门，好感度只有${intimacy}）你不太想让她进来，冷淡应付或找个借口，一句话`,
+                    messages, intimacy, playerRoom, luRoom, false, undefined, true
+                  )
+                } else {
+                  setPlayerRoom('guest_room')
+                  sendToAI(`（我敲了敲门走进来）你在客房里，说一句`, messages, intimacy, 'guest_room', luRoom, false, undefined, true)
+                }
+              }} style={{
+                flex: 1, background: 'rgba(201,169,110,0.08)',
+                border: '1px solid rgba(201,169,110,0.25)',
+                color: '#c9a96e', padding: '10px',
+                borderRadius: '8px', cursor: 'pointer', fontSize: '12px',
+                fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
+              }}>敲门</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 外出弹窗 */}
       {showOutside && (
