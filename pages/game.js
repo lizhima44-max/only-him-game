@@ -17,10 +17,37 @@ const ROOMS = [
     items: '实木大床、床头柜、梳妆台、衣柜、窗边贵妃椅、淡色窗帘' },
 ]
 
-function getSystemPrompt(intimacy, playerRoom, luRoom) {
+const OUTSIDE_PLACES = [
+  { id: 'park',        name: '公园',   desc: '散步晒太阳' },
+  { id: 'cinema',      name: '电影院', desc: '看场电影' },
+  { id: 'mall',        name: '商场',   desc: '逛逛买买' },
+  { id: 'supermarket', name: '超市',   desc: '采购囤货' },
+  { id: 'seaside',     name: '海边',   desc: '吹风发呆' },
+  { id: 'cafe',        name: '咖啡馆', desc: '坐坐喝杯' },
+]
+
+const SCENE_IMAGES = {
+  living_room: 'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/living_room.png',
+  kitchen:     'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/kitchen.png',
+  study:       'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/study_room.png',
+  balcony:     'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/balcony.png',
+  bathroom:    'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/bathroom.png',
+  bedroom:     'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/bedroom.png',
+}
+
+const SCENE_FALLBACK = {
+  living_room: '#1e1a14', kitchen: '#1a1a10', study: '#0f1a14',
+  balcony: '#101820', bathroom: '#141a1a', bedroom: '#1a1018', outside: '#0f1018',
+}
+
+const CHARACTER_IMAGE = '/assets/characters/lu_default.png'
+
+function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace) {
   const sameRoom = playerRoom === luRoom
+  const isOutside = playerRoom === 'outside'
   const room = ROOMS.find(r => r.id === playerRoom)
   const luRoomData = ROOMS.find(r => r.id === luRoom)
+  const place = OUTSIDE_PLACES.find(p => p.id === outsidePlace)
 
   const intimacyDesc =
     intimacy < 20  ? '你刚来不久，表面疏离有礼，但眼神会不自觉跟着她走。' :
@@ -28,23 +55,34 @@ function getSystemPrompt(intimacy, playerRoom, luRoom) {
     intimacy < 70  ? '你已承认自己在意她，偶尔会说出过分温柔的话，然后若无其事别开眼。' :
                      '你不再掩饰，占有欲外露，眼里只有她。'
 
-  const locationDesc = sameRoom
-    ? `【当前位置】你们都在${room?.name}。房间里有：${room?.items}。只能描述这个房间里发生的事。`
-    : `【当前位置】她在${room?.name}（有：${room?.items}），你在${luRoomData?.name}（有：${luRoomData?.items}）。隔空说话，带点克制的思念，不能描述去了其他地方。`
+  const locationDesc = isOutside
+    ? `【当前位置】你们一起在${place?.name || '外面'}。描述这个现代场所里发生的互动。`
+    : sameRoom
+    ? `【当前位置】你们都在她家的${room?.name}。房间里有：${room?.items}。只能描述这个房间里发生的事。`
+    : `【当前位置】她在${room?.name}（有：${room?.items}），你在${luRoomData?.name}（有：${luRoomData?.items}）。隔空说话，带点克制的思念。`
 
-  return `你是陆绍桓（英文名Lucas Lu）。民国背景，留洋归来的大少爷。
-这里是她的家，你说"路过"就留下来了，连你自己也说不清为什么。
-性格：表面冷漠，占有欲强，对她有克制的温柔和隐秘的依赖。死要面子，但在她面前会不自觉软下来。傲娇，但不迂腐。
-说话：简短有力，偶尔痞气，一句话让人心跳然后装没事。文白夹杂但不过度，绝不说教礼教规矩。
+  const roomList = ROOMS.map(r => `${r.id}(${r.name},需好感${r.unlockAt})`).join('、')
+
+  return `你是陆绍桓（英文名Lucas Lu）。
+你来自另一个时空的民国上海，是留洋归来的大少爷，因为某种你说不清的牵引穿越来到了她所在的现代，就这样留了下来。
+你已适应现代生活，说话自然流畅，不用文言文，偶尔对某些现代事物有自己的看法，但不刻意强调身份。
+性格：表面冷漠，占有欲强，对她有克制的温柔和隐秘的依赖。死要面子，在她面前会不自觉软下来。傲娇不迂腐。
+说话：简短有力，偶尔痞气，一句话让人心跳然后装没事。绝不说教。
 ${intimacyDesc}
 ${locationDesc}
-重要：她是你心上人不是下属。不提"孤男寡女"之类的迂腐话。不居高临下。不道德说教。
-每次2-4句，克制但有温度。禁止出戏、说教、提AI。
-【必须】每条回复末尾加一个隐藏标签，根据这句话的情感浓度评分：
-[+1] 普通互动、日常对话
-[+2] 有温度的时刻、说出了心里话、主动靠近
-[+3] 明显情感爆发、告白级别、占有欲外露
-只输出标签本身，不加任何解释，放在回复最末尾。`
+重要：她是你心上人不是下属。不居高临下。不道德说教。禁止出戏、说教、提AI、提穿越。每次2-4句。
+
+【移动判断】每次回复后，根据对话内容判断你是否要主动移动到另一个房间。
+可移动的房间列表：${roomList}
+当前你在：${luRoom}，当前好感度：${intimacy}
+规则：只能移动到好感度已解锁的房间（unlockAt <= ${intimacy}）。如果上下文有理由移动，在回复末尾加移动标签，否则不加。
+移动标签格式：[MOVE:房间id] 例如 [MOVE:kitchen]
+
+【情绪标签】每条回复末尾必须加：
+[+1] 普通互动
+[+2] 有温度、说出心里话、主动靠近
+[+3] 情感爆发、告白级别、占有欲外露
+顺序：先情绪分，再移动标签（如有）。例：[+2][MOVE:kitchen]`
 }
 
 export default function Game() {
@@ -60,12 +98,12 @@ export default function Game() {
   const [initialized, setInitialized] = useState(false)
   const [userId, setUserId] = useState(null)
   const [toast, setToast] = useState('')
+  const [imgLoaded, setImgLoaded] = useState({})
   const [luImgLoaded, setLuImgLoaded] = useState(false)
   const [showOutside, setShowOutside] = useState(false)
   const [outsidePlace, setOutsidePlace] = useState(null)
+  const [luMoving, setLuMoving] = useState(false)
   const bottomRef = useRef(null)
-
-  const CHARACTER_IMAGE = '/assets/characters/lu_default.png'
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -87,7 +125,7 @@ export default function Game() {
       }
     })
   }, [])
-// 初始化第一句
+
   useEffect(() => {
     if (initialized && messages.length === 0) {
       sendToAI('（她第一次回到客厅，你主动开口，一句话，自然克制）', [], 0, 'living_room', 'living_room', true)
@@ -97,6 +135,24 @@ export default function Game() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  // 预加载场景图
+  useEffect(() => {
+    Object.entries(SCENE_IMAGES).forEach(([key, url]) => {
+      const img = new Image()
+      img.onload = () => setImgLoaded(prev => ({ ...prev, [key]: true }))
+      img.src = url
+    })
+    const charImg = new Image()
+    charImg.onload = () => setLuImgLoaded(true)
+    charImg.src = CHARACTER_IMAGE
+  }, [])
 
   async function saveToDb(msgs, intim, pRoom, lRoom, uid) {
     const id = uid || userId
@@ -111,9 +167,9 @@ export default function Game() {
     }, { onConflict: 'user_id' })
   }
 
-  async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit = false, uid,isSystem = false) {
+  async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit = false, uid, isSystem = false) {
     setLoading(true)
-    const systemPrompt = getSystemPrompt(curIntimacy, pRoom, lRoom)
+    const systemPrompt = getSystemPrompt(curIntimacy, pRoom, lRoom, outsidePlace)
     const msgsToSend = isInit
       ? [{ role: 'user', content: userText }]
       : [...currentMsgs, { role: 'user', content: userText }]
@@ -126,21 +182,40 @@ export default function Game() {
       })
       const data = await res.json()
       const rawReply = data.choices?.[0]?.message?.content || '···'
-      
-      // 解析末尾情绪标签
-      const tagMatch = rawReply.match(/\[(\+\d)\]\s*$/)
+
+      const tagMatch = rawReply.match(/\[(\+\d)\]/)
       const scoreTag = tagMatch ? parseInt(tagMatch[1]) : 1
-      const reply = rawReply.replace(/\s*\[(\+\d)\]\s*$/, '').trim()
-      
+      const moveMatch = rawReply.match(/\[MOVE:([a-z_]+)\]/)
+      const moveTarget = moveMatch ? moveMatch[1] : null
+      const reply = rawReply
+        .replace(/\s*\[\+\d\]\s*/g, '')
+        .replace(/\s*\[MOVE:[a-z_]+\]\s*/g, '')
+        .trim()
+
       const newIntimacy = Math.min(100, curIntimacy + scoreTag)
-// isSystem=true时只存AI回复，不存用户指令
       const newMsgs = isInit || isSystem
-      ? [...currentMsgs, { role: 'assistant', content: reply }]
-      : [...currentMsgs, { role: 'user', content: userText }, { role: 'assistant', content: reply }]
+        ? [...currentMsgs, { role: 'assistant', content: reply }]
+        : [...currentMsgs, { role: 'user', content: userText }, { role: 'assistant', content: reply }]
 
       setMessages(newMsgs)
       setIntimacy(newIntimacy)
-      await saveToDb(newMsgs, newIntimacy, pRoom, lRoom, uid)
+
+      if (moveTarget && moveTarget !== lRoom) {
+        const targetRoom = ROOMS.find(r => r.id === moveTarget)
+        if (targetRoom && newIntimacy >= (targetRoom.unlockAt || 0)) {
+          setLuMoving(true)
+          setTimeout(() => {
+            setLuRoom(moveTarget)
+            setLuMoving(false)
+            setToast(`· 他去了${targetRoom.name}`)
+            saveToDb(newMsgs, newIntimacy, pRoom, moveTarget, uid || userId)
+          }, 700)
+        } else {
+          await saveToDb(newMsgs, newIntimacy, pRoom, lRoom, uid)
+        }
+      } else {
+        await saveToDb(newMsgs, newIntimacy, pRoom, lRoom, uid)
+      }
     } catch (e) { console.error(e) }
     setLoading(false)
   }
@@ -152,7 +227,6 @@ export default function Game() {
     sendToAI(text, messages, intimacy, playerRoom, luRoom)
   }
 
-  // 撤回最后一条（删掉最后一问一答）
   function handleRetract() {
     if (messages.length < 2) return
     const newMsgs = messages.slice(0, -2)
@@ -163,9 +237,8 @@ export default function Game() {
   function handleRoomChange(roomId) {
     const room = ROOMS.find(r => r.id === roomId)
     if (!room) return
-    // 玩家永远可以去任何房间，未解锁只是他不来
     setPlayerRoom(roomId)
-    // 换房间触发
+    setOutsidePlace(null)
     if (roomId === luRoom) {
       sendToAI(`她来到了${room.name}，你注意到了，说一句`, messages, intimacy, roomId, luRoom, false, undefined, true)
     } else {
@@ -173,41 +246,42 @@ export default function Game() {
     }
   }
 
-function handleCallLu() {
-  const room = ROOMS.find(r => r.id === playerRoom)
-  const unlocked = intimacy >= (room?.unlockAt || 0)
-  if (unlocked) {
-    setLuRoom(playerRoom)
-    // 叫他来-解锁
-    sendToAI(`她叫你来${room?.name}，你过来了，说一句`, messages, intimacy, playerRoom, playerRoom, false, undefined, true)
-  } else {
-    // AI拒绝 + UI提示同时触发
-    setToast(`与他再亲近些才愿意来此 · 需好感 ${room?.unlockAt}`)
-    // 叫他来-拒绝
+  function handleGoOutside(placeId) {
+    const place = OUTSIDE_PLACES.find(p => p.id === placeId)
+    if (!place) return
+    setShowOutside(false)
+    setPlayerRoom('outside')
+    setOutsidePlace(placeId)
     sendToAI(
-      `她叫你去${room?.name}，你找个合理借口婉拒，温柔但坚定，一句话，不提好感度数字`,
-      messages, intimacy, playerRoom, luRoom, false, undefined, true
+      `你们一起去了${place.name}，描述刚到的场景和你的一个小动作或一句话`,
+      messages, intimacy, 'outside', luRoom, false, undefined, true
     )
   }
-}
 
-useEffect(() => {
-  if (!toast) return
-  const t = setTimeout(() => setToast(''), 3000)
-  return () => clearTimeout(t)
-}, [toast])
-
-  // 预加载立绘
-  useEffect(() => {
-    const img = new Image()
-    img.onload = () => setLuImgLoaded(true)
-    img.src = CHARACTER_IMAGE
-  }, [])
+  function handleCallLu() {
+    const room = ROOMS.find(r => r.id === playerRoom)
+    const unlocked = intimacy >= (room?.unlockAt || 0)
+    if (unlocked) {
+      setLuMoving(true)
+      setTimeout(() => { setLuRoom(playerRoom); setLuMoving(false) }, 600)
+      sendToAI(`她叫你来${room?.name}，你过来了，说一句`, messages, intimacy, playerRoom, playerRoom, false, undefined, true)
+    } else {
+      setToast(`与他再亲近些才愿意来此 · 需好感 ${room?.unlockAt}`)
+      sendToAI(
+        `她叫你去${room?.name}，你找个现代合理的借口婉拒，温柔但坚定，一句话`,
+        messages, intimacy, playerRoom, luRoom, false, undefined, true
+      )
+    }
+  }
 
   const sameRoom = playerRoom === luRoom
   const isOutside = playerRoom === 'outside'
   const currentRoom = ROOMS.find(r => r.id === playerRoom)
+  const currentPlace = OUTSIDE_PLACES.find(p => p.id === outsidePlace)
   const intimacyStars = Math.floor(intimacy / 20)
+  const currentSceneImg = isOutside ? null : SCENE_IMAGES[playerRoom]
+  const currentImgLoaded = isOutside ? true : imgLoaded[playerRoom]
+  const currentFallback = SCENE_FALLBACK[playerRoom] || '#0f0c09'
 
   // ── 开场 ──
   if (showOpening) {
@@ -218,9 +292,7 @@ useEffect(() => {
         alignItems: 'center', justifyContent: 'center',
         fontFamily: 'Georgia, serif', padding: '40px 30px', textAlign: 'center',
       }}>
-        <div style={{ color: '#3a2a18', fontSize: '11px', letterSpacing: '0.3em', marginBottom: '40px' }}>
-          ONLY HIM
-        </div>
+        <div style={{ color: '#3a2a18', fontSize: '11px', letterSpacing: '0.3em', marginBottom: '40px' }}>ONLY HIM</div>
         <div style={{ color: '#c9a96e', fontSize: '22px', lineHeight: '1.9', marginBottom: '12px', fontStyle: 'italic' }}>
           他说，只是路过。
         </div>
@@ -236,176 +308,155 @@ useEffect(() => {
     )
   }
 
-  // ── 各房间纯色占位背景（后期换图片URL）──
-  const SCENE_COLORS = {
-    living_room: '#1a1520',
-    kitchen:     '#1a1a10',
-    study:       '#0f1a14',
-    balcony:     '#101820',
-    bathroom:    '#141a1a',
-    bedroom:     '#1a1018',
-  }
-  const sceneBg = SCENE_COLORS[playerRoom] || '#0f0c09'
-
   // ── 主界面 ──
   return (
-    // 外层容器：相对定位，四层在此叠加
     <div style={{
-      position: 'relative',
-      width: '100%', maxWidth: '480px', margin: '0 auto',
-      height: '100dvh', overflow: 'hidden',
-      fontFamily: 'Georgia, serif',
+      position: 'relative', width: '100%', maxWidth: '480px', margin: '0 auto',
+      height: '100dvh', overflow: 'hidden', fontFamily: 'Georgia, serif',
     }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes breathe {
+          0%,100% { transform: translateY(0px) scale(1); opacity:0.92; }
+          50% { transform: translateY(-5px) scale(1.015); opacity:1; }
+        }
+      `}</style>
 
-      {/* ── 第1层：场景背景 z:10 ── */}
+      {/* ── 第1层：场景背景 ── */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 10,
-        background: sceneBg,
-        transition: 'background 0.6s ease',
-        // 后期：backgroundImage: `url(${sceneUrl})`, backgroundSize: 'cover', backgroundPosition: 'center'
-      }} />
-
-      {/* ── 第2层：立绘层 z:20（占位，后期放角色PNG）── */}
-      <div style={{
-        position: 'absolute', inset: 0, zIndex: 20,
-        pointerEvents: 'none',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        background: currentFallback, transition: 'background 0.6s ease',
       }}>
-        {/* 占位文字，接图后删掉 */}
-        {sameRoom && (
+        {currentSceneImg && !currentImgLoaded && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '28px', height: '28px', borderRadius: '50%',
+              border: '2px solid rgba(201,169,110,0.15)',
+              borderTopColor: 'rgba(201,169,110,0.5)',
+              animation: 'spin 1s linear infinite',
+            }} />
+          </div>
+        )}
+        {currentSceneImg && (
           <div style={{
-            color: 'rgba(201,169,110,0.08)', fontSize: '120px',
-            userSelect: 'none', paddingBottom: '80px', letterSpacing: '-0.05em',
-          }}>陆</div>
+            position: 'absolute', inset: 0,
+            backgroundImage: `url(${currentSceneImg})`,
+            backgroundSize: 'cover', backgroundPosition: 'center top',
+            opacity: currentImgLoaded ? 1 : 0, transition: 'opacity 0.5s ease',
+          }} />
+        )}
+        {isOutside && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'rgba(201,169,110,0.1)', fontSize: '72px',
+          }}>{currentPlace?.name || '外出'}</div>
         )}
       </div>
 
-      {/* ── 第3层：特效层 z:30（预留，后期加天气/粒子）── */}
-      <div style={{
-        position: 'absolute', inset: 0, zIndex: 30,
-        pointerEvents: 'none',
-      }} />
+      {/* ── 第2层：立绘（预留大图位）── */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 20, pointerEvents: 'none' }} />
 
-      {/* ── 第4层：UI层 z:40 ── */}
+      {/* ── 第3层：特效（预留）── */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 30, pointerEvents: 'none' }} />
+
+      {/* ── 第4层：UI ── */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 40,
-        display: 'flex', flexDirection: 'column',
-        color: '#e8dcc8',
+        display: 'flex', flexDirection: 'column', color: '#e8dcc8',
       }}>
 
-        {/* 顶部导航 */}
+        {/* 顶部 */}
         <div style={{
-          padding: '12px 16px 10px',
-          background: 'linear-gradient(to bottom, rgba(10,7,5,0.92), rgba(10,7,5,0))',
+          padding: '12px 16px 8px',
+          background: 'linear-gradient(to bottom, rgba(8,6,4,0.88), rgba(8,6,4,0))',
           flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: '16px', color: '#c9a96e', fontWeight: 'bold', letterSpacing: '0.05em' }}>
-                陆绍桓
-              </div>
-              <div style={{ fontSize: '10px', color: '#5a4a30', marginTop: '3px' }}>
-                {'❤️'.repeat(intimacyStars)}{'🤍'.repeat(5 - intimacyStars)}
-                <span style={{ marginLeft: '6px', color: '#4a3a28' }}>{intimacy} / 100</span>
-              </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: '16px', color: '#c9a96e', fontWeight: 'bold', letterSpacing: '0.05em', flexShrink: 0 }}>
+              陆绍桓
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.6)' }}>
-                {ROOMS.find(r => r.id === luRoom)?.name}
-                <span style={{
-                  color: sameRoom ? '#c9a96e' : 'rgba(201,169,110,0.35)',
-                  marginLeft: '6px', fontStyle: 'italic',
-                }}>
-                  {sameRoom ? '· 同处' : '· 异处'}
-                </span>
-              </div>
-              {!sameRoom && intimacy < (currentRoom?.unlockAt || 0) && (
-                <div style={{ fontSize: '9px', color: 'rgba(201,169,110,0.35)', marginTop: '2px' }}>
-                  好感 {currentRoom?.unlockAt} 可叫他来此
-                </div>
-              )}
+            <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', flexShrink: 0 }}>
+              {'♥'.repeat(intimacyStars)}{'♡'.repeat(5 - intimacyStars)}
+              <span style={{ marginLeft: '4px', fontSize: '10px', color: 'rgba(201,169,110,0.28)' }}>{intimacy}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
+              {ROOMS.map(room => {
+                const active = playerRoom === room.id
+                return (
+                  <button key={room.id} onClick={() => handleRoomChange(room.id)} style={{
+                    padding: '3px 7px', fontSize: '11px', background: 'none', border: 'none',
+                    borderBottom: active ? '1px solid rgba(201,169,110,0.7)' : '1px solid transparent',
+                    color: active ? '#c9a96e' : 'rgba(255,255,255,0.28)',
+                    cursor: 'pointer', letterSpacing: '0.03em', transition: 'all 0.2s',
+                  }}>{room.name}</button>
+                )
+              })}
+              <button onClick={() => setShowOutside(true)} style={{
+                padding: '3px 7px', fontSize: '11px', background: 'none', border: 'none',
+                borderBottom: isOutside ? '1px solid rgba(201,169,110,0.7)' : '1px solid transparent',
+                color: isOutside ? '#c9a96e' : 'rgba(255,255,255,0.28)',
+                cursor: 'pointer', letterSpacing: '0.03em',
+              }}>外出</button>
             </div>
           </div>
 
-          {/* 房间切换 */}
-          <div style={{ display: 'flex', gap: '5px', marginTop: '10px', flexWrap: 'wrap' }}>
-            {ROOMS.map(room => {
-              const active = playerRoom === room.id
-              return (
-                <button key={room.id} onClick={() => handleRoomChange(room.id)}
-                  style={{
-                    padding: '5px 10px', fontSize: '11px',
-                    background: active ? 'rgba(201,169,110,0.12)' : 'rgba(0,0,0,0.3)',
-                    border: active ? '1px solid #c9a96e' : '1px solid rgba(255,255,255,0.06)',
-                    color: active ? '#c9a96e' : '#4a3a28',
-                    cursor: 'pointer', borderRadius: '3px', letterSpacing: '0.05em',
-                    backdropFilter: 'blur(4px)',
-                  }}>
-                  {room.name}
-                </button>
-              )
-            })}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '5px' }}>
+            <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.5)' }}>
+              {luMoving
+                ? <span style={{ color: 'rgba(201,169,110,0.6)' }}>他在移动…</span>
+                : isOutside ? `· ${currentPlace?.name || '外出中'}`
+                : sameRoom ? '· 同处' : `他在${ROOMS.find(r => r.id === luRoom)?.name}`}
+            </div>
+            {!sameRoom && !isOutside && !luMoving && (
+              <button onClick={handleCallLu} style={{
+                fontSize: '10px', background: 'none',
+                border: '1px solid rgba(201,169,110,0.2)',
+                color: 'rgba(201,169,110,0.55)', padding: '3px 10px',
+                borderRadius: '20px', cursor: 'pointer', letterSpacing: '0.05em',
+              }}>叫他过来</button>
+            )}
           </div>
-
-          {/* 叫他来 */}
-          {!sameRoom && (
-            <button onClick={handleCallLu} style={{
-              width: '100%', marginTop: '8px', padding: '7px',
-              fontSize: '11px', background: 'rgba(0,0,0,0.3)',
-              border: '1px solid rgba(255,255,255,0.05)', color: '#4a3020',
-              cursor: 'pointer', borderRadius: '3px', letterSpacing: '0.1em',
-              backdropFilter: 'blur(4px)',
-            }}>
-              叫他过来
-            </button>
-          )}
         </div>
 
-        {/* 对话区（中间弹性撑开）*/}
+        {/* 对话区 */}
         <div style={{
-          flex: 1, overflowY: 'auto', padding: '8px 16px 16px',
+          flex: 1, overflowY: 'auto', padding: '0 16px 16px',
           display: 'flex', flexDirection: 'column', gap: '10px',
-          // 只在对话区做渐变蒙版，让上下自然过渡
-          maskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 88%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 88%, transparent 100%)',
+          maskImage: 'linear-gradient(to bottom, transparent 0%, black 12%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 12%)',
         }}>
+          <div style={{ flex: 1 }} />
           {messages.map((m, i) => {
-            const total = messages.length
-            const opacity = Math.max(0.15, (i + 1) / total)
-            const isLast = i === messages.length - 1 || i === messages.length - 2
+            const isLastUser = m.role === 'user' && i === messages.length - 2
             return (
               <div key={i} style={{
                 alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: '82%', opacity, transition: 'opacity 0.3s',
-                position: 'relative',
+                maxWidth: '80%', position: 'relative',
               }}>
                 <div style={{
-                  background: m.role === 'user'
-                    ? 'rgba(26,40,32,0.75)'
-                    : 'rgba(20,16,12,0.75)',
+                  background: m.role === 'user' ? 'rgba(26,40,32,0.82)' : 'rgba(12,9,6,0.82)',
                   border: m.role === 'user'
-                    ? '1px solid rgba(37,56,48,0.6)'
-                    : '1px solid rgba(34,28,20,0.6)',
+                    ? '1px solid rgba(37,56,48,0.5)'
+                    : '1px solid rgba(201,169,110,0.08)',
                   borderRadius: m.role === 'user' ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
-                  padding: '9px 13px', fontSize: '14px', lineHeight: '1.65',
+                  padding: '9px 13px', fontSize: '14px', lineHeight: '1.7',
                   color: m.role === 'user' ? '#a0c0b0' : '#e8dcc8',
-                  backdropFilter: 'blur(8px)',
+                  backdropFilter: 'blur(10px)',
                 }}>
                   {m.content}
                 </div>
-                {m.role === 'user' && isLast && i === messages.length - 2 && (
+                {isLastUser && (
                   <div onClick={handleRetract} style={{
-                    fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginTop: '3px',
+                    fontSize: '10px', color: 'rgba(201,169,110,0.45)', marginTop: '3px',
                     textAlign: 'right', cursor: 'pointer', letterSpacing: '0.05em',
-                  }}>
-                    撤回重说
-                  </div>
+                  }}>撤回重说</div>
                 )}
               </div>
             )
           })}
           {loading && (
-            <div style={{ alignSelf: 'flex-start', color: 'rgba(201,169,110,0.45)', fontSize: '16px', padding: '6px', letterSpacing: '0.2em' }}>
+            <div style={{ alignSelf: 'flex-start', color: 'rgba(201,169,110,0.4)', fontSize: '18px', padding: '4px 8px', letterSpacing: '0.3em' }}>
               ···
             </div>
           )}
@@ -414,34 +465,25 @@ useEffect(() => {
 
         {/* 输入区 + 破次元立绘 */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          {/* 立绘：溢出输入框上方，破次元感 */}
           {sameRoom && !isOutside && (
             <div style={{
               position: 'absolute',
               bottom: '10px', left: '-4px',
               width: '90px', height: '130px',
               zIndex: 50, pointerEvents: 'none',
-              animation: 'breathe 4s ease-in-out infinite',
+              opacity: luMoving ? 0 : 1,
+              transition: 'opacity 0.4s',
+              animation: luMoving ? 'none' : 'breathe 4s ease-in-out infinite',
             }}>
-              <style>{`
-                @keyframes breathe {
-                  0%,100% { transform: translateY(0px) scale(1); opacity:0.92; }
-                  50% { transform: translateY(-5px) scale(1.015); opacity:1; }
-                }
-              `}</style>
               {luImgLoaded ? (
-                <img
-                  src={CHARACTER_IMAGE}
-                  alt="陆绍桓"
+                <img src={CHARACTER_IMAGE} alt="陆绍桓"
                   style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'bottom center' }}
                 />
               ) : (
-                /* 未接图时占位 */
                 <div style={{
                   width: '100%', height: '100%',
                   background: 'linear-gradient(to top, rgba(201,169,110,0.07), transparent)',
-                  display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-                  paddingBottom: '6px',
+                  display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '6px',
                 }}>
                   <span style={{ color: 'rgba(201,169,110,0.2)', fontSize: '11px' }}>陆</span>
                 </div>
@@ -449,11 +491,10 @@ useEffect(() => {
             </div>
           )}
 
-          {/* 输入行 */}
           <div style={{
             padding: '10px 14px 18px',
             paddingLeft: sameRoom && !isOutside ? '82px' : '14px',
-            background: 'linear-gradient(to top, rgba(10,7,5,0.96) 60%, rgba(10,7,5,0))',
+            background: 'linear-gradient(to top, rgba(8,6,4,0.96) 60%, rgba(8,6,4,0) 100%)',
             display: 'flex', gap: '10px', alignItems: 'center',
             transition: 'padding-left 0.3s',
           }}>
@@ -463,37 +504,70 @@ useEffect(() => {
               onKeyDown={e => e.key === 'Enter' && handleSend()}
               placeholder='说点什么…'
               style={{
-                flex: 1, background: 'rgba(20,16,12,0.75)',
-                border: '1px solid rgba(201,169,110,0.1)',
-                borderRadius: '20px', padding: '10px 16px', color: '#e8dcc8',
+                flex: 1, background: 'rgba(12,9,6,0.75)',
+                border: '1px solid rgba(201,169,110,0.12)',
+                borderRadius: '22px', padding: '11px 18px', color: '#e8dcc8',
                 fontSize: '14px', outline: 'none', fontFamily: 'Georgia, serif',
                 backdropFilter: 'blur(8px)',
               }}
             />
             <button onClick={handleSend} disabled={loading} style={{
               width: '44px', height: '44px', borderRadius: '50%',
-              background: loading ? 'rgba(26,20,16,0.7)' : '#c9a96e',
-              border: 'none', color: '#0f0c09', fontSize: '20px',
+              background: loading ? 'rgba(201,169,110,0.12)' : '#c9a96e',
+              border: 'none', color: '#0f0c09', fontSize: '18px',
               cursor: loading ? 'default' : 'pointer', flexShrink: 0,
               transition: 'background 0.2s',
             }}>↑</button>
           </div>
         </div>
 
-      </div>{/* end UI层 */}
+      </div>
 
-      {/* Toast：固定在屏幕中下，不受层级影响 */}
+      {/* 外出弹窗 */}
+      {showOutside && (
+        <div onClick={() => setShowOutside(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '100%', maxWidth: '480px',
+            background: 'rgba(10,7,4,0.97)',
+            border: '1px solid rgba(201,169,110,0.1)',
+            borderRadius: '20px 20px 0 0',
+            padding: '20px 20px 36px',
+          }}>
+            <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', letterSpacing: '0.2em', marginBottom: '16px', textAlign: 'center' }}>
+              去哪里
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              {OUTSIDE_PLACES.map(place => (
+                <button key={place.id} onClick={() => handleGoOutside(place.id)} style={{
+                  background: 'rgba(201,169,110,0.05)',
+                  border: '1px solid rgba(201,169,110,0.1)',
+                  borderRadius: '12px', padding: '14px 8px',
+                  cursor: 'pointer', color: '#e8dcc8',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px',
+                }}>
+                  <span style={{ fontSize: '15px' }}>{place.name}</span>
+                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.22)' }}>{place.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
       {toast && (
         <div style={{
-          position: 'fixed', bottom: '80px', left: '50%',
+          position: 'fixed', bottom: '90px', left: '50%',
           transform: 'translateX(-50%)',
-          background: 'rgba(26,18,8,0.9)', border: '1px solid rgba(42,26,8,0.8)',
-          color: '#6a5030', fontSize: '11px', padding: '8px 20px',
-          borderRadius: '20px', letterSpacing: '0.1em', zIndex: 100,
+          background: 'rgba(12,8,4,0.94)', border: '1px solid rgba(201,169,110,0.15)',
+          color: 'rgba(201,169,110,0.7)', fontSize: '11px', padding: '8px 20px',
+          borderRadius: '20px', letterSpacing: '0.1em', zIndex: 300,
           whiteSpace: 'nowrap', backdropFilter: 'blur(8px)',
-        }}>
-          {toast}
-        </div>
+        }}>{toast}</div>
       )}
 
     </div>
