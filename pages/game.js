@@ -39,7 +39,12 @@ function getSystemPrompt(intimacy, playerRoom, luRoom) {
 ${intimacyDesc}
 ${locationDesc}
 重要：她是你心上人不是下属。不提"孤男寡女"之类的迂腐话。不居高临下。不道德说教。
-每次2-4句，克制但有温度。禁止出戏、说教、提AI。`
+每次2-4句，克制但有温度。禁止出戏、说教、提AI。
+【必须】每条回复末尾加一个隐藏标签，根据这句话的情感浓度评分：
+[+1] 普通互动、日常对话
+[+2] 有温度的时刻、说出了心里话、主动靠近
+[+3] 明显情感爆发、告白级别、占有欲外露
+只输出标签本身，不加任何解释，放在回复最末尾。`
 }
 
 export default function Game() {
@@ -114,8 +119,14 @@ export default function Game() {
         body: JSON.stringify({ systemPrompt, messages: msgsToSend }),
       })
       const data = await res.json()
-      const reply = data.choices?.[0]?.message?.content || '···'
-      const newIntimacy = Math.min(100, curIntimacy + 1)
+      const rawReply = data.choices?.[0]?.message?.content || '···'
+      
+      // 解析末尾情绪标签
+      const tagMatch = rawReply.match(/\[(\+\d)\]\s*$/)
+      const scoreTag = tagMatch ? parseInt(tagMatch[1]) : 1
+      const reply = rawReply.replace(/\s*\[(\+\d)\]\s*$/, '').trim()
+      
+      const newIntimacy = Math.min(100, curIntimacy + scoreTag)
 // isSystem=true时只存AI回复，不存用户指令
       const newMsgs = isInit || isSystem
       ? [...currentMsgs, { role: 'assistant', content: reply }]
@@ -213,157 +224,222 @@ useEffect(() => {
     )
   }
 
+  const SCENE_IMAGES = {
+    living_room: 'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/living_room.png',
+    kitchen:     'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/kitchen.png',
+    study:       'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/study_room.png',
+    balcony:     'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/balcony.png',
+    bathroom:    'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/bathroom.png',
+    bedroom:     'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/bedroom.png',
+}
+  const sceneBg = SCENE_IMAGES[playerRoom] || '#0f0c09'
+
   // ── 主界面 ──
   return (
+    // 外层容器：相对定位，四层在此叠加
     <div style={{
-      minHeight: '100vh', background: '#0f0c09', color: '#e8dcc8',
-      display: 'flex', flexDirection: 'column',
-      maxWidth: '480px', margin: '0 auto', fontFamily: 'Georgia, serif',
+      position: 'relative',
+      width: '100%', maxWidth: '480px', margin: '0 auto',
+      height: '100dvh', overflow: 'hidden',
+      fontFamily: 'Georgia, serif',
     }}>
-      {/* 顶部 */}
+
+   {/* ── 第1层：场景背景 z:10 ── */}
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 10,
+      background: sceneBg,
+      backgroundImage: `url(${sceneBg})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center top',
+      transition: 'background 0.6s ease',
+      }} />
+
+      {/* ── 第2层：立绘层 z:20（占位，后期放角色PNG）── */}
       <div style={{
-        padding: '12px 16px 10px', borderBottom: '1px solid #1a1410',
-        background: '#0d0a07', position: 'sticky', top: 0, zIndex: 10,
+        position: 'absolute', inset: 0, zIndex: 20,
+        pointerEvents: 'none',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ fontSize: '16px', color: '#c9a96e', fontWeight: 'bold', letterSpacing: '0.05em' }}>
-              陆绍桓
-            </div>
-            <div style={{ fontSize: '10px', color: '#3a2a18', marginTop: '3px' }}>
-              {'❤️'.repeat(intimacyStars)}{'🤍'.repeat(5 - intimacyStars)}
-              <span style={{ marginLeft: '6px', color: '#4a3a28' }}>{intimacy} / 100</span>
-            </div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '11px', color: '#4a3a28' }}>
-              {ROOMS.find(r => r.id === luRoom)?.name}
-              <span style={{ color: sameRoom ? '#6a5a40' : '#2a1a10', marginLeft: '6px' }}>
-                {sameRoom ? '· 同处' : '· 异处'}
-              </span>
-            </div>
-            {/* 好感度不够时显示提示 */}
-            {!sameRoom && intimacy < (currentRoom?.unlockAt || 0) && (
-              <div style={{ fontSize: '9px', color: '#3a2010', marginTop: '2px' }}>
-                好感 {currentRoom?.unlockAt} 可叫他来此
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 房间切换 */}
-        <div style={{ display: 'flex', gap: '5px', marginTop: '10px', flexWrap: 'wrap' }}>
-          {ROOMS.map(room => {
-            const active = playerRoom === room.id
-            return (
-              <button key={room.id} onClick={() => handleRoomChange(room.id)}
-                style={{
-                  padding: '5px 10px', fontSize: '11px',
-                  background: active ? '#1e1508' : 'transparent',
-                  border: active ? '1px solid #c9a96e' : '1px solid #1e1410',
-                  color: active ? '#c9a96e' : '#4a3a28',
-                  cursor: 'pointer', borderRadius: '3px', letterSpacing: '0.05em',
-                }}>
-                {room.name}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* 叫他来 */}
-        {!sameRoom && (
-          <button onClick={handleCallLu} style={{
-            width: '100%', marginTop: '8px', padding: '7px',
-            fontSize: '11px', background: 'transparent',
-            border: '1px solid #1e1208', color: '#4a3020',
-            cursor: 'pointer', borderRadius: '3px', letterSpacing: '0.1em',
-          }}>
-            叫他过来
-          </button>
+        {/* 占位文字，接图后删掉 */}
+        {sameRoom && (
+          <div style={{
+            color: 'rgba(201,169,110,0.08)', fontSize: '120px',
+            userSelect: 'none', paddingBottom: '80px', letterSpacing: '-0.05em',
+          }}>陆</div>
         )}
       </div>
 
-      {/* 对话区 */}
+      {/* ── 第3层：特效层 z:30（预留，后期加天气/粒子）── */}
       <div style={{
-        flex: 1, overflowY: 'auto', padding: '16px',
-        display: 'flex', flexDirection: 'column', gap: '10px',
+        position: 'absolute', inset: 0, zIndex: 30,
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── 第4层：UI层 z:40 ── */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 40,
+        display: 'flex', flexDirection: 'column',
+        color: '#e8dcc8',
       }}>
-        {messages.map((m, i) => {
-          const total = messages.length
-          const opacity = Math.max(0.12, (i + 1) / total)
-          const isLast = i === messages.length - 1 || i === messages.length - 2
-          return (
-            <div key={i} style={{
-              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '82%', opacity, transition: 'opacity 0.3s',
-              position: 'relative',
-            }}>
-              <div style={{
-                background: m.role === 'user' ? '#1a2820' : '#14100c',
-                border: m.role === 'user' ? '1px solid #253830' : '1px solid #221c14',
-                borderRadius: m.role === 'user' ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
-                padding: '9px 13px', fontSize: '14px', lineHeight: '1.65',
-                color: m.role === 'user' ? '#a0c0b0' : '#e8dcc8',
-              }}>
-                {m.content}
+
+        {/* 顶部导航 */}
+        <div style={{
+          padding: '12px 16px 10px',
+          background: 'linear-gradient(to bottom, rgba(10,7,5,0.92), rgba(10,7,5,0))',
+          flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: '16px', color: '#c9a96e', fontWeight: 'bold', letterSpacing: '0.05em' }}>
+                陆绍桓
               </div>
-              {/* 最后一条用户消息显示撤回 */}
-              {m.role === 'user' && isLast && i === messages.length - 2 && (
-                <div
-                  onClick={handleRetract}
-                  style={{
-                    fontSize: '10px', color: '#2a1a10', marginTop: '3px',
-                    textAlign: 'right', cursor: 'pointer', letterSpacing: '0.05em',
-                  }}>
-                  撤回重说
+              <div style={{ fontSize: '10px', color: '#5a4a30', marginTop: '3px' }}>
+                {'❤️'.repeat(intimacyStars)}{'🤍'.repeat(5 - intimacyStars)}
+                <span style={{ marginLeft: '6px', color: '#4a3a28' }}>{intimacy} / 100</span>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '11px', color: '#4a3a28' }}>
+                {ROOMS.find(r => r.id === luRoom)?.name}
+                <span style={{ color: sameRoom ? '#6a5a40' : '#2a1a10', marginLeft: '6px' }}>
+                  {sameRoom ? '· 同处' : '· 异处'}
+                </span>
+              </div>
+              {!sameRoom && intimacy < (currentRoom?.unlockAt || 0) && (
+                <div style={{ fontSize: '9px', color: '#3a2010', marginTop: '2px' }}>
+                  好感 {currentRoom?.unlockAt} 可叫他来此
                 </div>
               )}
             </div>
-          )
-        })}
-        {loading && (
-          <div style={{ alignSelf: 'flex-start', color: '#3a2a18', fontSize: '13px', padding: '6px' }}>
-            ···
           </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-      {/* 提示条 */}
+
+          {/* 房间切换 */}
+          <div style={{ display: 'flex', gap: '5px', marginTop: '10px', flexWrap: 'wrap' }}>
+            {ROOMS.map(room => {
+              const active = playerRoom === room.id
+              return (
+                <button key={room.id} onClick={() => handleRoomChange(room.id)}
+                  style={{
+                    padding: '5px 10px', fontSize: '11px',
+                    background: active ? 'rgba(201,169,110,0.12)' : 'rgba(0,0,0,0.3)',
+                    border: active ? '1px solid #c9a96e' : '1px solid rgba(255,255,255,0.06)',
+                    color: active ? '#c9a96e' : '#4a3a28',
+                    cursor: 'pointer', borderRadius: '3px', letterSpacing: '0.05em',
+                    backdropFilter: 'blur(4px)',
+                  }}>
+                  {room.name}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* 叫他来 */}
+          {!sameRoom && (
+            <button onClick={handleCallLu} style={{
+              width: '100%', marginTop: '8px', padding: '7px',
+              fontSize: '11px', background: 'rgba(0,0,0,0.3)',
+              border: '1px solid rgba(255,255,255,0.05)', color: '#4a3020',
+              cursor: 'pointer', borderRadius: '3px', letterSpacing: '0.1em',
+              backdropFilter: 'blur(4px)',
+            }}>
+              叫他过来
+            </button>
+          )}
+        </div>
+
+        {/* 对话区（中间弹性撑开）*/}
+        <div style={{
+          flex: 1, overflowY: 'auto', padding: '8px 16px 16px',
+          display: 'flex', flexDirection: 'column', gap: '10px',
+          // 只在对话区做渐变蒙版，让上下自然过渡
+          maskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 88%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 88%, transparent 100%)',
+        }}>
+          {messages.map((m, i) => {
+            const total = messages.length
+            const opacity = Math.max(0.15, (i + 1) / total)
+            const isLast = i === messages.length - 1 || i === messages.length - 2
+            return (
+              <div key={i} style={{
+                alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                maxWidth: '82%', opacity, transition: 'opacity 0.3s',
+                position: 'relative',
+              }}>
+                <div style={{
+                  background: m.role === 'user'
+                    ? 'rgba(26,40,32,0.75)'
+                    : 'rgba(20,16,12,0.75)',
+                  border: m.role === 'user'
+                    ? '1px solid rgba(37,56,48,0.6)'
+                    : '1px solid rgba(34,28,20,0.6)',
+                  borderRadius: m.role === 'user' ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
+                  padding: '9px 13px', fontSize: '14px', lineHeight: '1.65',
+                  color: m.role === 'user' ? '#a0c0b0' : '#e8dcc8',
+                  backdropFilter: 'blur(8px)',
+                }}>
+                  {m.content}
+                </div>
+                {m.role === 'user' && isLast && i === messages.length - 2 && (
+                  <div onClick={handleRetract} style={{
+                    fontSize: '10px', color: '#2a1a10', marginTop: '3px',
+                    textAlign: 'right', cursor: 'pointer', letterSpacing: '0.05em',
+                  }}>
+                    撤回重说
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {loading && (
+            <div style={{ alignSelf: 'flex-start', color: '#3a2a18', fontSize: '13px', padding: '6px' }}>
+              ···
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* 输入区 */}
+        <div style={{
+          padding: '12px 16px',
+          background: 'linear-gradient(to top, rgba(10,7,5,0.95), rgba(10,7,5,0))',
+          display: 'flex', gap: '10px', flexShrink: 0,
+        }}>
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSend()}
+            placeholder='说点什么…'
+            style={{
+              flex: 1, background: 'rgba(20,16,12,0.7)', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '20px', padding: '10px 16px', color: '#e8dcc8',
+              fontSize: '14px', outline: 'none', fontFamily: 'Georgia, serif',
+              backdropFilter: 'blur(8px)',
+            }}
+          />
+          <button onClick={handleSend} disabled={loading} style={{
+            width: '44px', height: '44px', borderRadius: '50%',
+            background: loading ? 'rgba(26,20,16,0.7)' : '#c9a96e',
+            border: 'none', color: '#0f0c09', fontSize: '20px',
+            cursor: loading ? 'default' : 'pointer', flexShrink: 0,
+          }}>↑</button>
+        </div>
+
+      </div>{/* end UI层 */}
+
+      {/* Toast：固定在屏幕中下，不受层级影响 */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: '80px', left: '50%',
           transform: 'translateX(-50%)',
-          background: '#1a1208', border: '1px solid #2a1a08',
+          background: 'rgba(26,18,8,0.9)', border: '1px solid rgba(42,26,8,0.8)',
           color: '#6a5030', fontSize: '11px', padding: '8px 20px',
-          borderRadius: '20px', letterSpacing: '0.1em', zIndex: 50,
-          whiteSpace: 'nowrap',
+          borderRadius: '20px', letterSpacing: '0.1em', zIndex: 100,
+          whiteSpace: 'nowrap', backdropFilter: 'blur(8px)',
         }}>
           {toast}
         </div>
       )}
-      {/* 输入区 */}
-      <div style={{
-        padding: '12px 16px', borderTop: '1px solid #1a1410',
-        background: '#0d0a07', display: 'flex', gap: '10px',
-      }}>
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
-          placeholder='说点什么…'
-          style={{
-            flex: 1, background: '#14100c', border: '1px solid #1e1410',
-            borderRadius: '20px', padding: '10px 16px', color: '#e8dcc8',
-            fontSize: '14px', outline: 'none', fontFamily: 'Georgia, serif',
-          }}
-        />
-        <button onClick={handleSend} disabled={loading} style={{
-          width: '44px', height: '44px', borderRadius: '50%',
-          background: loading ? '#1a1410' : '#c9a96e',
-          border: 'none', color: '#0f0c09', fontSize: '20px',
-          cursor: loading ? 'default' : 'pointer', flexShrink: 0,
-        }}>↑</button>
-      </div>
+
     </div>
   )
 }
