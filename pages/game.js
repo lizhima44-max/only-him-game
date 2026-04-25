@@ -92,8 +92,12 @@ ${locationDesc}
 
 【移动标签】回复末尾按需加，格式 [MOVE:房间id]
 可移动：${roomList}
-当前位置：${luRoom}，好感度：${intimacy}
-只移动到 luCanFreely=true 或好感度达标的房间，有剧情理由才移动
+当前位置：${luRoom}，好感度：${intimacy}，她现在在：${isOutside ? (place?.name || '外出') : (room?.name || '未知')}
+规则：
+- 只移动到 luCanFreely=true 或好感度达标的房间
+- 她明确叫你去某个房间、或你们对话中约定去哪里，必须加对应MOVE标签
+- 剧情自然推进有理由移动也可以加
+- 没有理由不加
 
 【情绪标签】每条必加，放最末尾：
 [+1]普通 [+2]走心/靠近 [+3]爆发/占有
