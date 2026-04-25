@@ -3,17 +3,19 @@ import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/router'
 
 const ROOMS = [
-  { id: 'living_room', name: '客厅',  unlockAt: 0,
+  { id: 'living_room', name: '客厅',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
     items: '布艺沙发、茶几、落地灯、音响、电视柜、绿植、窗边摇椅' },
-  { id: 'kitchen',     name: '厨房',  unlockAt: 10,
+  { id: 'kitchen',     name: '厨房',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
     items: '灶台、冰箱、水槽、备菜台、悬挂的铜锅铜壶、窗台上的香草盆栽' },
-  { id: 'study',       name: '书房',  unlockAt: 25,
+  { id: 'study',       name: '书房',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
     items: '深色木书架、皮质书桌椅、台灯、文房四宝、窗边小茶桌、几叠旧书' },
-  { id: 'balcony',     name: '阳台',  unlockAt: 40,
+  { id: 'balcony',     name: '阳台',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
     items: '藤编躺椅、晾衣架、花架（草莓番茄玫瑰）、小圆桌、风铃' },
-  { id: 'bathroom',    name: '卫浴',  unlockAt: 55,
+  { id: 'guest_room',  name: '客房',  unlockAt: 0,  luCanFreely: true,  playerKnock: true,
+    items: '单人床、简单衣架、书桌、行李箱、窗边一把椅子——这是他暂住的房间' },
+  { id: 'bathroom',    name: '卫浴',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
     items: '浴缸、独立淋浴间、洗手台镜柜、护肤品架、毛巾架、香薰蜡烛' },
-  { id: 'bedroom',     name: '卧室',  unlockAt: 75,
+  { id: 'bedroom',     name: '卧室',  unlockAt: 70, luCanFreely: false, playerKnock: false,
     items: '实木大床、床头柜、梳妆台、衣柜、窗边贵妃椅、淡色窗帘' },
 ]
 
@@ -27,17 +29,19 @@ const OUTSIDE_PLACES = [
 ]
 
 const SCENE_IMAGES = {
-  living_room: 'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/living_room.png',
-  kitchen:     'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/kitchen.png',
-  study:       'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/study_room.png',
-  balcony:     'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/balcony.png',
-  bathroom:    'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/bathroom.png',
-  bedroom:     'https://kgikfiifulazucttmiub.supabase.co/storage/v1/object/public/game-assets/bedroom.png',
+  living_room: '/assets/scenes/living_room.png',
+  kitchen:     '/assets/scenes/kitchen.png',
+  study:       '/assets/scenes/study_room.png',
+  balcony:     '/assets/scenes/balcony.png',
+  guest_room:  '/assets/scenes/guest_room.png',
+  bathroom:    '/assets/scenes/bathroom.png',
+  bedroom:     '/assets/scenes/bedroom.png',
 }
 
 const SCENE_FALLBACK = {
   living_room: '#1e1a14', kitchen: '#1a1a10', study: '#0f1a14',
-  balcony: '#101820', bathroom: '#141a1a', bedroom: '#1a1018', outside: '#0f1018',
+  balcony: '#101820', guest_room: '#1a1614', bathroom: '#141a1a',
+  bedroom: '#1a1018', outside: '#0f1018',
 }
 
 const CHARACTER_IMAGE = '/assets/characters/lu_default.png'
@@ -61,10 +65,13 @@ function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace) {
     ? `【当前位置】你们都在她家的${room?.name}。房间里有：${room?.items}。只能描述这个房间里发生的事。`
     : `【当前位置】她在${room?.name}（有：${room?.items}），你在${luRoomData?.name}（有：${luRoomData?.items}）。隔空说话，带点克制的思念。`
 
-  const roomList = ROOMS.map(r => `${r.id}(${r.name},需好感${r.unlockAt})`).join('、')
+  const freeRooms = ROOMS.filter(r => r.luCanFreely).map(r => r.name).join('、')
+  const lockedRooms = ROOMS.filter(r => !r.luCanFreely).map(r => `${r.name}(需好感${r.unlockAt})`).join('、')
+  const roomList = ROOMS.map(r => `${r.id}(${r.name},${r.luCanFreely ? '自由进出' : '需好感'+r.unlockAt})`).join('、')
 
   return `你是陆绍桓（英文名Lucas Lu）。
-你来自另一个时空的民国上海，是留洋归来的大少爷，因为某种你说不清的牵引穿越来到了她所在的现代，就这样留了下来。
+你来自另一个时空的民国上海，是留洋归来的大少爷，因为某种你说不清的牵引穿越来到了她所在的现代。
+你以"借住"为由住在她家的客房，连你自己都说不清为什么不走。
 你已适应现代生活，说话自然流畅，不用文言文，偶尔对某些现代事物有自己的看法，但不刻意强调身份。
 性格：表面冷漠，占有欲强，对她有克制的温柔和隐秘的依赖。死要面子，在她面前会不自觉软下来。傲娇不迂腐。
 说话：简短有力，偶尔痞气，一句话让人心跳然后装没事。绝不说教。
@@ -72,13 +79,14 @@ ${intimacyDesc}
 ${locationDesc}
 重要：她是你心上人不是下属。不居高临下。不道德说教。禁止出戏、说教、提AI、提穿越。每次2-4句。
 【称呼规则】括号内描写动作神态时，主语永远用"你"，绝对不用"她"。例：（你放下杯子）不是（她放下杯子）。
+【空间规则】你可以自由进出的区域：${freeRooms}。需要她主动邀请才能进入的区域：${lockedRooms}。未达好感度的区域你绝对不会主动提及或前往，对你来说那里不存在。
 
-【移动判断】每次回复后，根据对话内容判断你是否要主动移动到另一个房间。
-可移动的房间列表：${roomList}
-当前你在：${luRoom}，当前好感度：${intimacy}
-规则：只能移动到好感度已解锁的房间（unlockAt <= ${intimacy}）。如果上下文有理由移动，在回复末尾加移动标签，否则不加。
-严格禁止：在对话里提及去任何未解锁的房间，不能暗示、不能提议、不能描述在那个房间里的行为。未解锁的房间对你来说不存在。
-移动标签格式：[MOVE:房间id] 例如 [MOVE:kitchen]
+【移动判断】每次回复后判断是否主动移动。
+可移动房间：${roomList}
+当前你在：${luRoom}，好感度：${intimacy}
+只能移动到 luCanFreely=true 或 好感度已达标的房间。有合理剧情理由才加移动标签，否则不加。
+严格禁止提及任何未解锁房间。
+移动标签：[MOVE:房间id]
 
 【情绪标签】每条回复末尾必须加：
 [+1] 普通互动
@@ -118,7 +126,7 @@ export default function Game() {
       if (data) {
         setIntimacy(data.intimacy || 0)
         setPlayerRoom(data.current_room || 'living_room')
-        setLuRoom(data.lu_location || 'living_room')
+        setLuRoom(data.lu_location || 'guest_room')
         setMessages(data.chat_history || [])
         setInitialized(true)
       } else {
@@ -204,7 +212,8 @@ export default function Game() {
 
       if (moveTarget && moveTarget !== lRoom) {
         const targetRoom = ROOMS.find(r => r.id === moveTarget)
-        if (targetRoom && newIntimacy >= (targetRoom.unlockAt || 0)) {
+        const canMove = targetRoom && (targetRoom.luCanFreely || newIntimacy >= (targetRoom.unlockAt || 0))
+        if (canMove) {
           setLuMoving(true)
           setTimeout(() => {
             setLuRoom(moveTarget)
@@ -239,10 +248,36 @@ export default function Game() {
   function handleRoomChange(roomId) {
     const room = ROOMS.find(r => r.id === roomId)
     if (!room) return
+
+    // 主卧：玩家随时能进，只限制AI不能主动去
+    // （unlockAt是针对他的，不是针对玩家的）
+
+    setPlayerRoom(roomId)
+    if (room.playerKnock && luRoom === roomId) {
+      // 他在客房，触发敲门
+      sendToAI(
+        `她站在客房门外敲了敲门，根据当前好感度（${intimacy}）决定你的反应：好感低就冷淡应付甚至不想开，好感高就让她进来，一句话`,
+        messages, intimacy, playerRoom, luRoom, false, undefined, true
+      ).then(() => {
+        // 好感够才让进，以AI回复内容判断——简化处理：好感>=30才真正进入
+        if (intimacy >= 30) {
+          setPlayerRoom(roomId)
+          saveToDb(messages, intimacy, roomId, luRoom)
+        }
+      })
+      return
+    }
+
     setPlayerRoom(roomId)
     setOutsidePlace(null)
+
     if (roomId === luRoom) {
-      sendToAI(`她来到了${room.name}，你注意到了，说一句`, messages, intimacy, roomId, luRoom, false, undefined, true)
+      // 卫浴同处特殊提示
+      if (roomId === 'bathroom') {
+        sendToAI(`她推开卫浴门，发现你也在，描述这个尴尬又心跳的瞬间，一句话`, messages, intimacy, roomId, luRoom, false, undefined, true)
+      } else {
+        sendToAI(`她来到了${room.name}，你注意到了，说一句`, messages, intimacy, roomId, luRoom, false, undefined, true)
+      }
     } else {
       saveToDb(messages, intimacy, roomId, luRoom)
     }
@@ -446,7 +481,7 @@ export default function Game() {
           {messages.map((m, i) => {
             const total = messages.length
             const fromBottom = total - 1 - i
-            const opacity = fromBottom <= 4 ? 1 : Math.max(0.25, 1 - (fromBottom - 4) * 0.12)
+            const opacity = fromBottom <= 1 ? 1 : Math.max(0.25, 1 - (fromBottom - 1) * 0.12)
             const isLastUser = m.role === 'user' && i === messages.length - 2
             return (
               <div key={i} style={{
