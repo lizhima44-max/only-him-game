@@ -291,15 +291,19 @@ export default function Game() {
 
   function handleCallLu() {
     const room = ROOMS.find(r => r.id === playerRoom)
-    const unlocked = intimacy >= (room?.unlockAt || 0)
-    if (unlocked) {
+    const canCome = room?.luCanFreely || intimacy >= (room?.unlockAt || 0)
+    if (canCome) {
       setLuMoving(true)
-      setTimeout(() => { setLuRoom(playerRoom); setLuMoving(false) }, 600)
-      sendToAI(`她叫你来${room?.name}，你过来了，说一句`, messages, intimacy, playerRoom, playerRoom, false, undefined, true)
+      setTimeout(() => {
+        setLuRoom(playerRoom)
+        setLuMoving(false)
+        saveToDb(messages, intimacy, playerRoom, playerRoom)
+      }, 600)
+      sendToAI(`（我叫他来${room?.name}，他过来了）说一句`, messages, intimacy, playerRoom, playerRoom, false, undefined, true)
     } else {
       setToast(`与他再亲近些才愿意来此 · 需好感 ${room?.unlockAt}`)
       sendToAI(
-        `她叫你去${room?.name}，你找个现代合理的借口婉拒，温柔但坚定，一句话`,
+        `（我叫你来${room?.name}，你不太想去）找个现代合理的借口婉拒，温柔但坚定，一句话`,
         messages, intimacy, playerRoom, luRoom, false, undefined, true
       )
     }
