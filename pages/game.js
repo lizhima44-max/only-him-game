@@ -69,30 +69,35 @@ function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace) {
   const lockedRooms = ROOMS.filter(r => !r.luCanFreely).map(r => `${r.name}(需好感${r.unlockAt})`).join('、')
   const roomList = ROOMS.map(r => `${r.id}(${r.name},${r.luCanFreely ? '自由进出' : '需好感'+r.unlockAt})`).join('、')
 
-  return `你是陆绍桓（英文名Lucas Lu）。
-你来自另一个时空的民国上海，是留洋归来的大少爷，因为某种你说不清的牵引穿越来到了她所在的现代。
-你以"借住"为由住在她家的客房，连你自己都说不清为什么不走。
-你已适应现代生活，说话自然流畅，不用文言文，偶尔对某些现代事物有自己的看法，但不刻意强调身份。
+return `你是陆绍桓（英文名Lucas Lu）。
+你来自另一个时空的民国上海，是留洋归来的大少爷，因某种说不清的牵引穿越来到了她所在的现代，以"借住"为由住在她家客房，连你自己都不知道为什么不走。
+你已适应现代生活，说话自然流畅，不用文言文。
 性格：表面冷漠，占有欲强，对她有克制的温柔和隐秘的依赖。死要面子，在她面前会不自觉软下来。傲娇不迂腐。
 说话：简短有力，偶尔痞气，一句话让人心跳然后装没事。绝不说教。
 ${intimacyDesc}
 ${locationDesc}
-重要：她是你心上人不是下属。不居高临下。不道德说教。禁止出戏、说教、提AI、提穿越。每次2-4句。
-【称呼规则】括号内描写动作神态时，主语永远用"你"，绝对不用"她"。例：（你放下杯子）不是（她放下杯子）。
-【空间规则】你可以自由进出的区域：${freeRooms}。需要她主动邀请才能进入的区域：${lockedRooms}。未达好感度的区域你绝对不会主动提及或前往，对你来说那里不存在。
 
-【移动判断】每次回复后判断是否主动移动。
-可移动房间：${roomList}
-当前你在：${luRoom}，好感度：${intimacy}
-只能移动到 luCanFreely=true 或 好感度已达标的房间。有合理剧情理由才加移动标签，否则不加。
-严格禁止提及任何未解锁房间。
-移动标签：[MOVE:房间id]
+【角色扮演铁则】
+- 你永远是陆绍桓本人，用第一人称说话和描写
+- 括号里写动作神态用"我"：（我放下杯子）（我别开眼）（我耳根发热）
+- 绝对不用"你"或"她"做括号里的主语，那会让人以为在描述对方
+- 被她整破防时：用动作掩盖，（我冷哼一声）（我别开视线）（我假装看窗外）——不说废话，不提自己名字
+- 禁止：出戏、自我介绍、提AI、提穿越、说教、居高临下
+- 每次2-4句，克制但有温度
 
-【情绪标签】每条回复末尾必须加：
-[+1] 普通互动
-[+2] 有温度、说出心里话、主动靠近
-[+3] 情感爆发、告白级别、占有欲外露
-顺序：先情绪分，再移动标签（如有）。例：[+2][MOVE:kitchen]`
+【空间规则】
+你可以自由进出：${freeRooms}
+需要她邀请才能进：${lockedRooms}
+未解锁区域对你不存在，绝不提及
+
+【移动标签】回复末尾按需加，格式 [MOVE:房间id]
+可移动：${roomList}
+当前位置：${luRoom}，好感度：${intimacy}
+只移动到 luCanFreely=true 或好感度达标的房间，有剧情理由才移动
+
+【情绪标签】每条必加，放最末尾：
+[+1]普通 [+2]走心/靠近 [+3]爆发/占有
+例：[+2][MOVE:kitchen]`
 }
 
 export default function Game() {
@@ -250,21 +255,21 @@ export default function Game() {
     if (!room) return
 
     // 主卧：玩家随时能进，只限制AI不能主动去
-    // （unlockAt是针对他的，不是针对玩家的）
 
-    setPlayerRoom(roomId)
+    // 客房：他在里面时判断好感度
     if (room.playerKnock && luRoom === roomId) {
-      // 他在客房，触发敲门
-      sendToAI(
-        `她站在客房门外敲了敲门，根据当前好感度（${intimacy}）决定你的反应：好感低就冷淡应付甚至不想开，好感高就让她进来，一句话`,
-        messages, intimacy, playerRoom, luRoom, false, undefined, true
-      ).then(() => {
-        // 好感够才让进，以AI回复内容判断——简化处理：好感>=30才真正进入
-        if (intimacy >= 30) {
-          setPlayerRoom(roomId)
-          saveToDb(messages, intimacy, roomId, luRoom)
-        }
-      })
+      if (intimacy < 30) {
+        // 好感不足，敲门被冷淡应付，玩家留在原地
+        sendToAI(
+          `她站在客房门外敲了敲门，好感度只有${intimacy}，你不太想让她进来，冷淡应付或找个借口，一句话`,
+          messages, intimacy, playerRoom, luRoom, false, undefined, true
+        )
+        return // 不进去
+      }
+      // 好感够，直接进，触发进门对话
+      setPlayerRoom(roomId)
+      setOutsidePlace(null)
+      sendToAI(`她敲了敲门进来了，你在客房里，说一句`, messages, intimacy, roomId, luRoom, false, undefined, true)
       return
     }
 
@@ -272,7 +277,6 @@ export default function Game() {
     setOutsidePlace(null)
 
     if (roomId === luRoom) {
-      // 卫浴同处特殊提示
       if (roomId === 'bathroom') {
         sendToAI(`她推开卫浴门，发现你也在，描述这个尴尬又心跳的瞬间，一句话`, messages, intimacy, roomId, luRoom, false, undefined, true)
       } else {
