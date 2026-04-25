@@ -71,6 +71,7 @@ function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace) {
 ${intimacyDesc}
 ${locationDesc}
 重要：她是你心上人不是下属。不居高临下。不道德说教。禁止出戏、说教、提AI、提穿越。每次2-4句。
+【称呼规则】括号内描写动作神态时，主语永远用"你"，绝对不用"她"。例：（你放下杯子）不是（她放下杯子）。
 
 【移动判断】每次回复后，根据对话内容判断你是否要主动移动到另一个房间。
 可移动的房间列表：${roomList}
@@ -402,9 +403,9 @@ export default function Game() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '5px' }}>
-            <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.5)' }}>
+            <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.65)' }}>
               {luMoving
-                ? <span style={{ color: 'rgba(201,169,110,0.6)' }}>他在移动…</span>
+                ? <span style={{ color: 'rgba(201,169,110,0.8)' }}>他在移动…</span>
                 : isOutside ? `· ${currentPlace?.name || '外出中'}`
                 : sameRoom ? '· 同处' : `他在${ROOMS.find(r => r.id === luRoom)?.name}`}
             </div>
@@ -428,11 +429,15 @@ export default function Game() {
         }}>
           <div style={{ flex: 1 }} />
           {messages.map((m, i) => {
+            const total = messages.length
+            const fromBottom = total - 1 - i
+            const opacity = fromBottom <= 1 ? 1 : Math.max(0.25, 1 - (fromBottom - 1) * 0.12)
             const isLastUser = m.role === 'user' && i === messages.length - 2
             return (
               <div key={i} style={{
                 alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: '80%', position: 'relative',
+                maxWidth: '80%', opacity, transition: 'opacity 0.3s',
+                position: 'relative',
               }}>
                 <div style={{
                   background: m.role === 'user' ? 'rgba(26,40,32,0.82)' : 'rgba(12,9,6,0.82)',
@@ -448,7 +453,7 @@ export default function Game() {
                 </div>
                 {isLastUser && (
                   <div onClick={handleRetract} style={{
-                    fontSize: '10px', color: 'rgba(201,169,110,0.45)', marginTop: '3px',
+                    fontSize: '10px', color: 'rgba(201,169,110,0.65)', marginTop: '3px',
                     textAlign: 'right', cursor: 'pointer', letterSpacing: '0.05em',
                   }}>撤回重说</div>
                 )}
