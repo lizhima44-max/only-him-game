@@ -123,6 +123,7 @@ export default function Game() {
   const [outsidePlace, setOutsidePlace] = useState(null)
   const [luMoving, setLuMoving] = useState(false)
   const [showKnock, setShowKnock] = useState(false)
+  const [expandedAction, setExpandedAction] = useState(null) // 'niwai' | 'prank' | 'room' | null
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -364,6 +365,8 @@ export default function Game() {
           0%,100% { transform: translateY(0px) scale(1); opacity:0.92; }
           50% { transform: translateY(-5px) scale(1.015); opacity:1; }
         }
+        .action-row { scrollbar-width: none; }
+        .action-row::-webkit-scrollbar { display: none; }
       `}</style>
       <div style={{
         position: 'fixed', inset: 0,
@@ -559,33 +562,240 @@ export default function Game() {
             </div>
           )}
 
+
+          {/* ── 互动按钮行 + 输入框 ── */}
           <div style={{
-            padding: '10px 14px 18px',
-            paddingLeft: sameRoom && !isOutside ? '82px' : '14px',
-            background: 'linear-gradient(to top, rgba(8,6,4,0.96) 60%, rgba(8,6,4,0) 100%)',
-            display: 'flex', gap: '10px', alignItems: 'center',
-            transition: 'padding-left 0.3s',
+            background: 'linear-gradient(to top, rgba(8,6,4,0.97) 60%, rgba(8,6,4,0) 100%)',
+            flexShrink: 0,
           }}>
-            <input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder='说点什么…'
-              style={{
-                flex: 1, background: 'rgba(12,9,6,0.75)',
+            {/* 互动按钮主行 */}
+            <div className="action-row" style={{
+              display: 'flex', gap: '6px', padding: '8px 14px 4px',
+              overflowX: 'auto', scrollbarWidth: 'none',
+            }}>
+              {/* 腻歪 */}
+              <button
+                onClick={() => setExpandedAction(expandedAction === 'niwai' ? null : 'niwai')}
+                style={{
+                  flexShrink: 0, padding: '6px 14px',
+                  background: expandedAction === 'niwai' ? 'rgba(201,169,110,0.2)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${expandedAction === 'niwai' ? 'rgba(201,169,110,0.4)' : 'rgba(201,169,110,0.12)'}`,
+                  borderRadius: '20px', color: expandedAction === 'niwai' ? '#c9a96e' : 'rgba(201,169,110,0.55)',
+                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+                  fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
+                  transition: 'all 0.2s',
+                }}
+              >腻歪</button>
+
+              {/* 恶作剧 */}
+              <button
+                onClick={() => setExpandedAction(expandedAction === 'prank' ? null : 'prank')}
+                style={{
+                  flexShrink: 0, padding: '6px 14px',
+                  background: expandedAction === 'prank' ? 'rgba(201,169,110,0.2)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${expandedAction === 'prank' ? 'rgba(201,169,110,0.4)' : 'rgba(201,169,110,0.12)'}`,
+                  borderRadius: '20px', color: expandedAction === 'prank' ? '#c9a96e' : 'rgba(201,169,110,0.55)',
+                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+                  fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
+                  transition: 'all 0.2s',
+                }}
+              >恶作剧</button>
+
+              {/* 分隔 */}
+              <div style={{ width: '1px', background: 'rgba(201,169,110,0.1)', flexShrink: 0, margin: '4px 2px' }} />
+
+              {/* 当前房间专属按钮 */}
+              {!isOutside && (() => {
+                const roomActions = {
+                  living_room: [
+                    { label: '泡茶', prompt: '她去泡了杯茶，你注意到了，说一句' },
+                    { label: '看电视', prompt: '她窝在沙发开始看电视，你在旁边，随口说一句' },
+                    { label: '发呆', prompt: '她在客厅发呆，你看见了，说一句' },
+                  ],
+                  kitchen: [
+                    { label: '一起做饭', prompt: '她叫你一起进厨房做饭，你的反应，一句话' },
+                    { label: '蹭饭', prompt: '她在做饭你凑过去蹭了一口，说一句' },
+                  ],
+                  study: [
+                    { label: '借书', prompt: '她进书房想借本书，你抬头看了她一眼，说一句' },
+                    { label: '打扰他', prompt: '她故意进书房打扰你，你的反应，一句话' },
+                  ],
+                  balcony: [
+                    { label: '看星星', prompt: '她在阳台看星星，你跟出来了，说一句' },
+                    { label: '浇花', prompt: '她蹲下来浇花，你站在旁边，说一句' },
+                  ],
+                  guest_room: [
+                    { label: '坐会儿', prompt: '她进了客房坐下，你坐在对面，说一句' },
+                  ],
+                  bathroom: [
+                    { label: '尴尬一下', prompt: '浴室里两个人都在，描述这个尴尬的瞬间，一句话' },
+                  ],
+                  bedroom: [
+                    { label: '躺一躺', prompt: '她走进卧室躺下，你站在门口，说一句' },
+                    { label: '说说话', prompt: '卧室里安静，她想和你说说话，你的反应' },
+                  ],
+                }
+                const acts = roomActions[playerRoom] || []
+                return acts.map(a => (
+                  <button
+                    key={a.label}
+                    onClick={() => {
+                      setExpandedAction(null)
+                      sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                    }}
+                    style={{
+                      flexShrink: 0, padding: '6px 14px',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(201,169,110,0.12)',
+                      borderRadius: '20px', color: 'rgba(201,169,110,0.55)',
+                      fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+                      fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
+                      transition: 'all 0.2s',
+                    }}
+                  >{a.label}</button>
+                ))
+              })()}
+
+              {/* 外出专属 */}
+              {isOutside && (() => {
+                const outsideActions = {
+                  park:        [{ label: '散步', prompt: '你们在公园散步，你走在她旁边，说一句' }, { label: '坐草地', prompt: '她突然坐到草地上，你站在旁边，说一句' }],
+                  cinema:      [{ label: '挑电影', prompt: '你们站在影院门口选电影，你说一句' }, { label: '买爆米花', prompt: '她去买爆米花，你跟着，说一句' }],
+                  mall:        [{ label: '逛逛', prompt: '她在商场橱窗前停下来，你说一句' }, { label: '帮她提包', prompt: '你把她的袋子拿过来，说一句' }],
+                  supermarket: [{ label: '推车', prompt: '你接过了超市的购物车，说一句' }, { label: '挑东西', prompt: '她拿起什么东西在研究，你凑过去，说一句' }],
+                  seaside:     [{ label: '吹风', prompt: '海边的风把她头发吹乱了，你看着，说一句' }, { label: '捡贝壳', prompt: '她蹲下来捡贝壳，你站在旁边，说一句' }],
+                  cafe:        [{ label: '点单', prompt: '服务员来了，她在想点什么，你替她说了一句' }, { label: '发呆', prompt: '咖啡馆里很安静，你们都有点发呆，你先开口' }],
+                }
+                const acts = outsideActions[outsidePlace] || []
+                return acts.map(a => (
+                  <button
+                    key={a.label}
+                    onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
+                    style={{
+                      flexShrink: 0, padding: '6px 14px',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(201,169,110,0.12)',
+                      borderRadius: '20px', color: 'rgba(201,169,110,0.55)',
+                      fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+                      fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
+                    }}
+                  >{a.label}</button>
+                ))
+              })()}
+            </div>
+
+            {/* 展开面板：腻歪 */}
+            {expandedAction === 'niwai' && (
+              <div style={{
+                margin: '0 14px 6px',
+                background: 'rgba(12,9,6,0.82)', backdropFilter: 'blur(12px)',
                 border: '1px solid rgba(201,169,110,0.12)',
-                borderRadius: '22px', padding: '11px 18px', color: '#e8dcc8',
-                fontSize: '14px', outline: 'none', fontFamily: 'Georgia, serif',
-                backdropFilter: 'blur(8px)',
-              }}
-            />
-            <button onClick={handleSend} disabled={loading} style={{
-              width: '44px', height: '44px', borderRadius: '50%',
-              background: loading ? 'rgba(201,169,110,0.12)' : '#c9a96e',
-              border: 'none', color: '#0f0c09', fontSize: '18px',
-              cursor: loading ? 'default' : 'pointer', flexShrink: 0,
-              transition: 'background 0.2s',
-            }}>↑</button>
+                borderRadius: '14px', padding: '10px 12px',
+              }}>
+                <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', letterSpacing: '0.15em', marginBottom: '8px' }}>
+                  腻歪一下
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {[
+                    { label: '蹭蹭脸', prompt: '她把脸凑过来蹭了你一下，你的反应，一句话' },
+                    { label: '摸摸头', prompt: '她让你摸摸她的头，说一句' },
+                    { label: '撒个娇', prompt: '她软着声音撒娇，你的反应，一句话' },
+                    { label: '牵手', prompt: '她悄悄把手伸过来，你看了一眼，说一句' },
+                    { label: '靠着你', prompt: '她靠在你肩上，你感觉到了，说一句' },
+                    { label: '抱一下', prompt: '她突然过来抱了你一下，你的反应' },
+                    { label: '说悄悄话', prompt: '她凑到你耳边说了句悄悄话，你的反应' },
+                    { label: '捏捏脸', prompt: '她伸手捏了你的脸，你的反应，一句话' },
+                  ].map(a => (
+                    <button
+                      key={a.label}
+                      onClick={() => {
+                        setExpandedAction(null)
+                        sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                      }}
+                      style={{
+                        padding: '5px 12px',
+                        background: 'rgba(201,169,110,0.06)',
+                        border: '1px solid rgba(201,169,110,0.15)',
+                        borderRadius: '20px', color: 'rgba(201,169,110,0.7)',
+                        fontSize: '12px', cursor: 'pointer',
+                        fontFamily: 'Georgia, serif',
+                      }}
+                    >{a.label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 展开面板：恶作剧 */}
+            {expandedAction === 'prank' && (
+              <div style={{
+                margin: '0 14px 6px',
+                background: 'rgba(12,9,6,0.82)', backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(201,169,110,0.12)',
+                borderRadius: '14px', padding: '10px 12px',
+              }}>
+                <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', letterSpacing: '0.15em', marginBottom: '8px' }}>
+                  整整他
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {[
+                    { label: '戳他脸', prompt: '她伸出手指戳了戳他的脸，他的反应，一句话' },
+                    { label: '偷看他', prompt: '她趁他不注意一直盯着他看，他发现了，说一句' },
+                    { label: '突然亲一下', prompt: '她突然踮脚亲了一下他的侧脸，他的反应' },
+                    { label: '挡住他的书', prompt: '她把手压在他的书上挡住，他的反应，一句话' },
+                    { label: '学他讲话', prompt: '她开始模仿他说话的腔调，他发现了，说一句' },
+                    { label: '无缘无故推他', prompt: '她没来由推了他一把，他的反应，一句话' },
+                    { label: '偷他东西', prompt: '她趁他不注意拿走了他手边的东西，他发现了' },
+                    { label: '装作要走', prompt: '她假装要走，看他有没有反应，结果如何，一句话' },
+                  ].map(a => (
+                    <button
+                      key={a.label}
+                      onClick={() => {
+                        setExpandedAction(null)
+                        sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                      }}
+                      style={{
+                        padding: '5px 12px',
+                        background: 'rgba(201,169,110,0.06)',
+                        border: '1px solid rgba(201,169,110,0.15)',
+                        borderRadius: '20px', color: 'rgba(201,169,110,0.7)',
+                        fontSize: '12px', cursor: 'pointer',
+                        fontFamily: 'Georgia, serif',
+                      }}
+                    >{a.label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 输入框行 */}
+            <div style={{
+              padding: '6px 14px 18px',
+              paddingLeft: sameRoom && !isOutside ? '82px' : '14px',
+              display: 'flex', gap: '10px', alignItems: 'center',
+              transition: 'padding-left 0.3s',
+            }}>
+              <input
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSend()}
+                placeholder='说点什么…'
+                style={{
+                  flex: 1, background: 'rgba(12,9,6,0.75)',
+                  border: '1px solid rgba(201,169,110,0.12)',
+                  borderRadius: '22px', padding: '11px 18px', color: '#e8dcc8',
+                  fontSize: '14px', outline: 'none', fontFamily: 'Georgia, serif',
+                  backdropFilter: 'blur(8px)',
+                }}
+              />
+              <button onClick={handleSend} disabled={loading} style={{
+                width: '44px', height: '44px', borderRadius: '50%',
+                background: loading ? 'rgba(201,169,110,0.12)' : '#c9a96e',
+                border: 'none', color: '#0f0c09', fontSize: '18px',
+                cursor: loading ? 'default' : 'pointer', flexShrink: 0,
+                transition: 'background 0.2s',
+              }}>↑</button>
+            </div>
           </div>
         </div>
 
