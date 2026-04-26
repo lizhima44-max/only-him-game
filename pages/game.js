@@ -608,32 +608,46 @@ export default function Game() {
                   guest_room: [
                     { label: '坐会儿', prompt: '她进了客房坐下，你坐在对面，说一句' },
                   ],
-                  bathroom: [
-                    { label: '尴尬一下', prompt: '浴室里两个人都在，描述这个尴尬的瞬间，一句话' },
-                  ],
+                  bathroom: [],
                   bedroom: [
                     { label: '躺一躺', prompt: '她走进卧室躺下，你站在门口，说一句' },
                     { label: '说说话', prompt: '卧室里安静，她想和你说说话，你的反应' },
                   ],
                 }
                 const acts = roomActions[playerRoom] || []
+                // 通用按钮样式
+                const btnStyle = (active = false) => ({
+                  flexShrink: 0, padding: '6px 14px',
+                  background: active ? 'rgba(201,169,110,0.18)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${active ? 'rgba(201,169,110,0.4)' : 'rgba(201,169,110,0.12)'}`,
+                  borderRadius: '20px',
+                  color: active ? '#c9a96e' : 'rgba(201,169,110,0.55)',
+                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+                  fontFamily: 'Georgia, serif', letterSpacing: '0.05em', transition: 'all 0.2s',
+                })
                 return (
                   <>
                     {acts.map(a => (
                       <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                        style={{ flexShrink: 0, padding: '6px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px', color: 'rgba(201,169,110,0.55)', fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)', fontFamily: 'Georgia, serif', letterSpacing: '0.05em', transition: 'all 0.2s' }}
+                        style={btnStyle()}
                       >{a.label}</button>
                     ))}
-                    {/* 浴室专属入口 */}
+                    {/* 书房：日记本（不需要同处，是他自己的日记） */}
+                    {playerRoom === 'study' && (
+                      <button onClick={() => {
+                        sendToAI('你在书房，写一篇关于她的日记（你自己的内心独白，不让她看到的那种），2-4句，第一人称，克制但藏不住', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                      }} style={btnStyle()}>他的日记</button>
+                    )}
+                    {/* 浴室：入口，不需要同处（自己在浴室也可以） */}
                     {playerRoom === 'bathroom' && (
                       <button onClick={() => setExpandedAction(expandedAction === 'bath' ? null : 'bath')}
-                        style={{ flexShrink: 0, padding: '6px 14px', background: expandedAction === 'bath' ? 'rgba(100,140,200,0.18)' : 'rgba(100,140,200,0.06)', border: `1px solid ${expandedAction === 'bath' ? 'rgba(100,140,200,0.35)' : 'rgba(100,140,200,0.18)'}`, borderRadius: '20px', color: expandedAction === 'bath' ? 'rgba(160,200,240,0.9)' : 'rgba(140,180,220,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif', transition: 'all 0.2s' }}
+                        style={btnStyle(expandedAction === 'bath')}
                       >浴室互动</button>
                     )}
-                    {/* 卧室专属入口 */}
+                    {/* 卧室：需同处才显示 */}
                     {playerRoom === 'bedroom' && sameRoom && (
                       <button onClick={() => setExpandedAction(expandedAction === 'bedroom_intimate' ? null : 'bedroom_intimate')}
-                        style={{ flexShrink: 0, padding: '6px 14px', background: expandedAction === 'bedroom_intimate' ? 'rgba(180,80,100,0.18)' : 'rgba(180,80,100,0.06)', border: `1px solid ${expandedAction === 'bedroom_intimate' ? 'rgba(200,80,100,0.35)' : 'rgba(180,80,100,0.18)'}`, borderRadius: '20px', color: expandedAction === 'bedroom_intimate' ? 'rgba(230,130,140,0.9)' : 'rgba(200,120,130,0.5)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif', transition: 'all 0.2s' }}
+                        style={btnStyle(expandedAction === 'bedroom_intimate')}
                       >卧室氛围</button>
                     )}
                   </>
@@ -756,70 +770,76 @@ export default function Game() {
               <div style={{
                 margin: '0 14px 6px',
                 background: 'rgba(12,9,6,0.85)', backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(100,140,200,0.18)',
+                border: '1px solid rgba(201,169,110,0.12)',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
                 {bathPhase === 'idle' && (
                   <>
-                    <div style={{ fontSize: '10px', color: 'rgba(140,180,220,0.5)', letterSpacing: '0.15em', marginBottom: '8px' }}>浴室</div>
-                    {/* 非亲密日常互动 */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-                      {[
-                        { label: '帮我洗头', prompt: '她让陆绍桓帮她洗头，他的反应，描述一句' },
+                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', letterSpacing: '0.15em', marginBottom: '8px' }}>浴室</div>
+                    {/* 不需要同处：自己护理 */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: sameRoom ? '8px' : '0' }}>
+                      {(sameRoom ? [
+                        // 同处才有：需要他帮忙的
+                        { label: '帮我洗头', prompt: '她让陆绍桓帮她洗头，他的反应' },
                         { label: '帮我搓背', prompt: '她让陆绍桓帮她搓背，他的反应，一句话' },
                         { label: '帮我吹头发', prompt: '她让陆绍桓帮她吹头发，他的反应和动作' },
                         { label: '帮你刮胡子', prompt: '她主动给陆绍桓刮胡子，他的反应' },
-                        { label: '泡个澡', prompt: '她泡进浴缸里，陆绍桓进来了，说一句' },
-                      ].map(a => (
+                        { label: '泡个澡', prompt: '她泡进浴缸里，陆绍桓也在里面，说一句' },
+                      ] : [
+                        // 不同处：自己在浴室叫他
+                        { label: '叫他进来', prompt: '她在浴室外叫陆绍桓进来帮忙，他推开门，说一句' },
+                        { label: '帮我吹头发', prompt: '她洗完出来让陆绍桓帮她吹头发，他的反应' },
+                      ]).map(a => (
                         <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                          style={{ padding: '5px 12px', background: 'rgba(100,140,200,0.06)', border: '1px solid rgba(100,140,200,0.15)', borderRadius: '20px', color: 'rgba(160,200,240,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
+                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
-                    {/* 一起洗 */}
+                    {/* 一起洗：需同处 */}
                     {sameRoom && (
                       <button onClick={() => {
                         setBathPhase('asking')
-                        sendToAI('她问你要不要一起洗，你的回应，如果愿意回复里带❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
-                      }} style={{ padding: '6px 16px', background: 'rgba(100,140,200,0.12)', border: '1px solid rgba(100,140,200,0.25)', borderRadius: '20px', color: 'rgba(160,200,240,0.8)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif', marginTop: '2px' }}
+                        sendToAI('她问陆绍桓要不要一起洗，他的回应，如果愿意回复里自然包含❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                      }} style={{ padding: '6px 16px', background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)', borderRadius: '20px', color: 'rgba(201,169,110,0.8)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif', marginTop: '2px' }}
                       >一起洗？</button>
                     )}
                   </>
                 )}
                 {bathPhase === 'asking' && (
-                  <div style={{ fontSize: '12px', color: 'rgba(160,200,240,0.6)', textAlign: 'center', padding: '8px 0' }}>
+                  <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', textAlign: 'center', padding: '8px 0' }}>
                     等他回应…
-                    <button onClick={() => setBathPhase('idle')} style={{ marginLeft: '10px', background: 'none', border: 'none', color: 'rgba(201,169,110,0.4)', cursor: 'pointer', fontSize: '11px' }}>取消</button>
+                    <button onClick={() => setBathPhase('idle')} style={{ marginLeft: '10px', background: 'none', border: 'none', color: 'rgba(201,169,110,0.3)', cursor: 'pointer', fontSize: '11px' }}>取消</button>
                   </div>
                 )}
                 {bathPhase === 'agreed' && (
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => { setBathPhase('active'); sendToAI('你们确定一起洗了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                      style={{ flex: 1, padding: '8px', background: 'rgba(100,140,200,0.15)', border: '1px solid rgba(100,140,200,0.3)', borderRadius: '10px', color: 'rgba(160,200,240,0.9)', fontSize: '12px', cursor: 'pointer' }}>一起进去</button>
+                      style={{ flex: 1, padding: '8px', background: 'rgba(201,169,110,0.12)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '10px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer' }}>一起进去</button>
                     <button onClick={() => setBathPhase('idle')} style={{ padding: '8px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer' }}>算了</button>
                   </div>
                 )}
                 {bathPhase === 'active' && (
                   <>
-                    <div style={{ fontSize: '10px', color: 'rgba(140,180,220,0.5)', marginBottom: '8px' }}>一起洗澡中</div>
+                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>一起洗澡中</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                       {[
                         { label: '帮我洗头', prompt: '你们一起洗澡，她让陆绍桓帮她洗头，他的反应' },
                         { label: '帮我搓背', prompt: '你们一起洗澡，她让陆绍桓帮她搓背，他的反应' },
+                        { label: '靠着他', prompt: '你们一起在浴室，她往他身上靠了一下，他的反应' },
                       ].map(a => (
                         <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
-                          style={{ padding: '5px 12px', background: 'rgba(100,140,200,0.06)', border: '1px solid rgba(100,140,200,0.15)', borderRadius: '20px', color: 'rgba(160,200,240,0.7)', fontSize: '12px', cursor: 'pointer' }}
+                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
                     {intimacy >= 50 && intimatePhase === 'idle' && (
                       <button onClick={() => {
                         setIntimatePhase('asking')
-                        sendToAI('你们一起在浴室里，她想要更进一步，你自然地回应她，如果愿意带❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
-                      }} style={{ padding: '6px 14px', background: 'rgba(200,100,120,0.12)', border: '1px solid rgba(200,100,120,0.2)', borderRadius: '20px', color: 'rgba(220,150,160,0.8)', fontSize: '12px', cursor: 'pointer' }}>再进一步</button>
+                        sendToAI('你们一起在浴室里，她想要更进一步，陆绍桓自然地回应，如果愿意带❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                      }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.2)', borderRadius: '20px', color: 'rgba(201,169,110,0.8)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>再近一点</button>
                     )}
                     <button onClick={() => { setBathPhase('idle'); sendToAI('洗澡结束了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                      style={{ marginLeft: '8px', padding: '6px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer' }}>洗完了</button>
+                      style={{ marginLeft: '8px', padding: '6px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>洗完了</button>
                   </>
                 )}
               </div>
@@ -830,16 +850,16 @@ export default function Game() {
               <div style={{
                 margin: '0 14px 6px',
                 background: 'rgba(12,9,6,0.85)', backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(180,100,120,0.18)',
+                border: '1px solid rgba(201,169,110,0.12)',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
                 {/* 浪漫值进度条 */}
                 <div style={{ marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(220,150,160,0.5)', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '4px' }}>
                     <span>浪漫值</span><span>{romantic}/100</span>
                   </div>
                   <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${romantic}%`, background: 'linear-gradient(to right, rgba(200,100,120,0.6), rgba(220,150,160,0.8))', borderRadius: '4px', transition: 'width 0.4s' }} />
+                    <div style={{ height: '100%', width: `${romantic}%`, background: 'linear-gradient(to right, rgba(201,169,110,0.4), rgba(201,169,110,0.8))', borderRadius: '4px', transition: 'width 0.4s' }} />
                   </div>
                 </div>
 
@@ -847,53 +867,57 @@ export default function Game() {
                   <>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                       {[
-                        { label: '点蜡烛', action: () => { const n = Math.min(100, romantic + 20); setRomantic(n); sendToAI('她点上了蜡烛，你注意到了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
-                        { label: '营造气氛', action: () => { const n = Math.min(100, romantic + 10); setRomantic(n); sendToAI('她在营造浪漫气氛，你感觉到了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
+                        { label: '点蜡烛', action: () => { setRomantic(n => Math.min(100, n + 20)); sendToAI('她点上了蜡烛，你注意到了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
+                        { label: '营造气氛', action: () => { setRomantic(n => Math.min(100, n + 10)); sendToAI('她在营造浪漫气氛，你感觉到了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
                         { label: '靠着你', action: () => sendToAI('她在卧室靠在你身边，你感觉到了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) },
                         { label: '说晚安', action: () => sendToAI('她说晚安，你的回应，一句话', messages, intimacy, playerRoom, luRoom, false, undefined, true) },
                       ].map(a => (
-                        <button key={a.label} onClick={() => { a.action() }}
-                          style={{ padding: '5px 12px', background: 'rgba(180,100,120,0.06)', border: '1px solid rgba(180,100,120,0.15)', borderRadius: '20px', color: 'rgba(220,150,160,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
+                        <button key={a.label} onClick={() => a.action()}
+                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
-                    {romantic >= 60 && sameRoom && intimacy >= 50 && (
+                    {romantic >= 60 && sameRoom && intimacy >= 50 ? (
                       <button onClick={() => {
                         setIntimatePhase('asking')
                         sendToAI('卧室里气氛很好，她主动靠近你，你感觉到了她的意思，自然地回应，如果愿意带❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
-                      }} style={{ padding: '6px 16px', background: 'rgba(200,80,100,0.15)', border: '1px solid rgba(200,80,100,0.25)', borderRadius: '20px', color: 'rgba(230,130,140,0.9)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>❤️ 再近一点</button>
-                    )}
-                    {romantic < 60 && (
-                      <div style={{ fontSize: '10px', color: 'rgba(180,100,120,0.35)', marginTop: '4px' }}>浪漫值需要60以上才能继续</div>
+                      }} style={{ padding: '6px 16px', background: 'rgba(201,169,110,0.15)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '20px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>再近一点</button>
+                    ) : (
+                      <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.25)', marginTop: '4px' }}>
+                        {!sameRoom ? '他不在这里' : romantic < 60 ? `浪漫值 ${romantic}/60` : `好感度需要50以上`}
+                      </div>
                     )}
                   </>
                 )}
                 {intimatePhase === 'asking' && (
-                  <div style={{ fontSize: '12px', color: 'rgba(220,150,160,0.6)', textAlign: 'center', padding: '8px 0' }}>等他回应…</div>
+                  <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', textAlign: 'center', padding: '8px 0' }}>等他回应…
+                    <button onClick={() => setIntimatePhase('idle')} style={{ marginLeft: '10px', background: 'none', border: 'none', color: 'rgba(201,169,110,0.3)', cursor: 'pointer', fontSize: '11px' }}>取消</button>
+                  </div>
                 )}
                 {intimatePhase === 'agreed' && (
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => { setIntimatePhase('game'); sendToAI('你们决定了，描述这个时刻的开始，用第一人称，克制温柔', messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                      style={{ flex: 1, padding: '8px', background: 'rgba(200,80,100,0.15)', border: '1px solid rgba(200,80,100,0.3)', borderRadius: '10px', color: 'rgba(230,130,140,0.9)', fontSize: '12px', cursor: 'pointer' }}>继续</button>
+                      style={{ flex: 1, padding: '8px', background: 'rgba(201,169,110,0.12)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '10px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer' }}>继续</button>
                     <button onClick={() => setIntimatePhase('idle')} style={{ padding: '8px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer' }}>算了</button>
                   </div>
                 )}
                 {intimatePhase === 'game' && (
                   <>
-                    <div style={{ fontSize: '10px', color: 'rgba(220,150,160,0.5)', marginBottom: '8px' }}>氛围进行中</div>
+                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>氛围进行中</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       {[
-                        { label: '慢一点', prompt: '她说慢一点，你的回应' },
-                        { label: '抱紧我', prompt: '她说抱紧我，你的反应' },
-                        { label: '亲亲', prompt: '她想要你亲她，你的反应' },
+                        { label: '慢一点', prompt: '她说慢一点，他的回应' },
+                        { label: '抱紧我', prompt: '她说抱紧我，他的反应' },
+                        { label: '亲亲', prompt: '她想要他亲她，他的反应' },
+                        { label: '别停', prompt: '她说别停，他的反应，一句话' },
                       ].map(a => (
                         <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
-                          style={{ padding: '5px 12px', background: 'rgba(200,80,100,0.06)', border: '1px solid rgba(200,80,100,0.15)', borderRadius: '20px', color: 'rgba(230,130,140,0.7)', fontSize: '12px', cursor: 'pointer' }}
+                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
-                    <button onClick={() => { setIntimatePhase('aftercare'); setRomantic(0); sendToAI('结束了，你温柔地陪着她，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                      style={{ marginTop: '8px', padding: '6px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer' }}>结束</button>
+                    <button onClick={() => { setIntimatePhase('aftercare'); setRomantic(0); sendToAI('结束了，他温柔地陪着她，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
+                      style={{ marginTop: '8px', padding: '6px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>结束</button>
                   </>
                 )}
                 {intimatePhase === 'aftercare' && (
@@ -902,10 +926,11 @@ export default function Game() {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       {[
                         { label: '抱着睡', prompt: '她窝在他怀里想睡着，他说一句' },
-                        { label: '说说话', prompt: '事后她靠着他说了句什么，他的回应' },
+                        { label: '说说话', prompt: '事后她靠着他，说了句什么，他的回应' },
+                        { label: '亲额头', prompt: '他轻轻亲了她额头，她的感受，一句话' },
                       ].map(a => (
                         <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
-                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px', color: 'rgba(201,169,110,0.6)', fontSize: '12px', cursor: 'pointer' }}
+                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px', color: 'rgba(201,169,110,0.6)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
