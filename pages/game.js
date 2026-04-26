@@ -207,6 +207,7 @@ export default function Game() {
   const [rhythm, setRhythm] = useState(2)
   const [isAiTurn, setIsAiTurn] = useState(false)
   const [selAct, setSelAct] = useState('kiss_lip')
+  const [bathAftercare, setBathAftercare] = useState(false) // 浴室专属余温
   const aiTimerRef = useRef(null)
 
   useEffect(() => {
@@ -450,7 +451,8 @@ export default function Game() {
       })
       const data = await res.json()
       const reply = data.choices?.[0]?.message?.content || '···'
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+      // AI动作标签 + AI回复合并成一条assistant消息
+      setMessages(prev => [...prev, { role: 'assistant', content: `${actionLabel}\n${reply}` }])
     } catch (e) { console.error(e) }
   }
 
@@ -500,7 +502,7 @@ export default function Game() {
       newC = clamp(curC + act.cD*pos.cB*0.9, 0, 100)
     }
     setRhythm(newRh); setMProg(newM); setCProg(newC); setIsAiTurn(false)
-    setMessages(prev => [...prev, { role: 'user', content: `· ${act.label}` }])
+    // AI动作+回复在sendIntimAI里合并成一条assistant消息，这里不再单独push
     sendIntimAI(act.label, pos.hint, newM, newC, newRh, isBath)
     if (newM >= 100 && newC >= 100) endIntimGame(isBath, pos)
   }
@@ -511,13 +513,22 @@ export default function Game() {
     setIsAiTurn(false)
     if (aiTimerRef.current) clearTimeout(aiTimerRef.current)
     setIntimatePhase('aftercare')
-    if (isBath) setBathPhase('idle')
+    setBathAftercare(isBath)   // 记录是哪个场景的余温
+    // 浴室：余温先不重置bathPhase，等她点"离开浴室"才重置
     setRomantic(0)
     saveToDb(messages, intimacy, playerRoom, luRoom, undefined, newWk, 0)
     sendToAI(
-      '结束了，陆绍桓温柔地陪着她，余温里说一句，不急不躁',
+      isBath
+        ? '浴室里结束了，水雾还在，他温柔地把她裹进浴巾，余温里说一句，不急不躁'
+        : '卧室里结束了，他温柔地陪着她，余温里说一句，不急不躁',
       messages, intimacy, playerRoom, luRoom, false, undefined, true
     )
+  }
+
+  function resetIntimFull() {
+    resetIntim()
+    setBathAftercare(false)
+    if (bathAftercare) setBathPhase('idle')
   }
 
   const sameRoom = playerRoom === luRoom
@@ -988,7 +999,10 @@ export default function Game() {
               }}>
                 {bathPhase === 'idle' && (
                   <>
-                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', letterSpacing: '0.15em', marginBottom: '8px' }}>浴室</div>
+                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', letterSpacing: '0.15em', marginBottom: '8px' }}>
+                  浴室
+                  {totalWk > 0 && <span style={{ marginLeft: '8px', color: 'rgba(201,169,110,0.2)', fontSize: '9px' }}>×{totalWk}</span>}
+                </div>
                     {/* 不需要同处：自己护理 */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: sameRoom ? '8px' : '0' }}>
                       {(sameRoom ? [
@@ -1108,7 +1122,7 @@ export default function Game() {
                           </div>
                           {isAiTurn && <div style={{ fontSize:'10px', color:'rgba(201,169,110,0.35)', marginBottom:'6px', letterSpacing:'0.08em' }}>他在行动…</div>}
                           <select value={selAct} onChange={e=>setSelAct(e.target.value)} disabled={isAiTurn}
-                            style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'8px', padding:'6px 8px', color:isAiTurn?'rgba(255,255,255,0.2)':'#e8dcc8', fontSize:'11px', fontFamily:'Georgia,serif', outline:'none', marginBottom:'6px' }}>
+                            style={{ width:'100%', background:'#12100e', border:'1px solid rgba(201,169,110,0.15)', borderRadius:'8px', padding:'6px 8px', color:isAiTurn?'rgba(255,255,255,0.2)':'#e8dcc8', fontSize:'11px', fontFamily:'Georgia,serif', outline:'none', marginBottom:'6px', colorScheme:'dark' }}>
                             {PLAYER_ACTIONS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
                           </select>
                           <button onClick={doPlayerAction} disabled={isAiTurn}
@@ -1136,7 +1150,11 @@ export default function Game() {
                 {/* 浪漫值进度条 */}
                 <div style={{ marginBottom: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '4px' }}>
-                    <span>浪漫值</span><span>{romantic}/100</span>
+                    <span>浪漫值</span>
+                    <span>
+                      {romantic}/60
+                      {totalWk > 0 && <span style={{ marginLeft: '8px', color: 'rgba(201,169,110,0.2)', fontSize: '9px' }}>×{totalWk}</span>}
+                    </span>
                   </div>
                   <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${romantic}%`, background: 'linear-gradient(to right, rgba(201,169,110,0.4), rgba(201,169,110,0.8))', borderRadius: '4px', transition: 'width 0.4s' }} />
@@ -1233,7 +1251,7 @@ export default function Game() {
                       </div>
                       {isAiTurn && <div style={{ fontSize:'10px', color:'rgba(201,169,110,0.4)', marginBottom:'5px', letterSpacing:'0.1em' }}>他在行动…</div>}
                       <select value={selAct} onChange={e=>setSelAct(e.target.value)} disabled={isAiTurn}
-                        style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'8px', padding:'7px 10px', color:isAiTurn?'rgba(255,255,255,0.2)':'#e8dcc8', fontSize:'12px', fontFamily:'Georgia,serif', outline:'none', marginBottom:'6px' }}>
+                        style={{ width:'100%', background:'#12100e', border:'1px solid rgba(201,169,110,0.15)', borderRadius:'8px', padding:'7px 10px', color:isAiTurn?'rgba(255,255,255,0.2)':'#e8dcc8', fontSize:'12px', fontFamily:'Georgia,serif', outline:'none', marginBottom:'6px', colorScheme:'dark' }}>
                         {PLAYER_ACTIONS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
                       </select>
                       <button onClick={doPlayerAction} disabled={isAiTurn}
@@ -1245,20 +1263,42 @@ export default function Game() {
                 })()}
                 {intimatePhase === 'aftercare' && (
                   <>
-                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', marginBottom: '8px', letterSpacing: '0.12em' }}>余温 · 还在</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {[
-                        { label: '抱着睡', prompt: '她窝在陆绍桓怀里，快要睡着，他轻轻说一句，声音低沉温柔' },
-                        { label: '说说话', prompt: '事后两人静静靠着，她先开口说了句什么，他的回应，克制里有温柔' },
-                        { label: '亲额头', prompt: '陆绍桓在余温里轻轻亲了她的额头，带点不自知的温柔，写他的动作和内心一句话' },
-                        { label: '他先睡', prompt: '陆绍桓慢慢闭上眼，她看着他，描述这一刻' },
-                      ].map(a => (
+                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', marginBottom: '8px', letterSpacing: '0.12em' }}>
+                      {bathAftercare ? '🚿 浴室余温 · 还在' : '🌙 余温 · 还在'}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                      {(bathAftercare ? [
+                        { label: '靠着他', prompt: '浴室里事后，她往他身上靠，水雾还没散，他的反应，一句话' },
+                        { label: '帮我擦干', prompt: '他帮她把头发擦干，动作轻，余温里说一句' },
+                        { label: '亲一下', prompt: '浴室余温里她踮脚亲了他一下，他的反应' },
+                        { label: '说说话', prompt: '浴室里，水声停了，两个人靠着，她先开口，他的回应' },
+                      ] : [
+                        { label: '抱着睡', prompt: '她窝在他怀里，快要睡着，他轻轻说一句，声音低沉温柔' },
+                        { label: '说说话', prompt: '事后两人静静靠着，她先开口，他的回应，克制里有温柔' },
+                        { label: '亲额头', prompt: '他在余温里轻轻亲了她的额头，带点不自知的温柔，写动作和内心一句话' },
+                        { label: '说晚安', prompt: '她说晚安，他的回应，余温里的一句话，低沉温柔' },
+                      ]).map(a => (
                         <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
                           style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px', color: 'rgba(201,169,110,0.6)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
-                    <button onClick={() => setIntimatePhase('idle')} style={{ marginTop: '8px', padding: '5px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', color: 'rgba(255,255,255,0.15)', fontSize: '11px', cursor: 'pointer' }}>结束余温</button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {/* 浴室余温可以再来一次（还在浴室里嘛） */}
+                      {bathAftercare && (
+                        <button onClick={() => {
+                          resetIntim()
+                          setBathAftercare(false)
+                          // bathPhase保持active，可以继续
+                          const avail = getAvailPos(true)
+                          setSelPos(avail[0]?.id || 'bath_stand')
+                          setIntimatePhase('agreed')
+                        }} style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.2)', borderRadius: '20px', color: 'rgba(201,169,110,0.6)', fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>还要</button>
+                      )}
+                      <button onClick={resetIntimFull} style={{ padding: '5px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', color: 'rgba(255,255,255,0.15)', fontSize: '11px', cursor: 'pointer' }}>
+                        {bathAftercare ? '离开浴室' : '结束余温'}
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
