@@ -133,14 +133,18 @@ export default function Game() {
       const { data } = await supabase
         .from('game_saves').select('*')
         .eq('user_id', session.user.id).single()
-      if (data) {
+      const isReturningUser = data && data.chat_history && data.chat_history.length > 0
+      if (isReturningUser) {
         setIntimacy(data.intimacy || 0)
         setPlayerRoom(data.current_room || 'living_room')
         setLuRoom(data.lu_location || 'guest_room')
-        setMessages(data.chat_history || [])
+        setMessages(data.chat_history)
         setInitialized(true)
       } else {
-        await supabase.from('game_saves').insert({ user_id: session.user.id })
+        await supabase.from('game_saves').upsert(
+          { user_id: session.user.id },
+          { onConflict: 'user_id', ignoreDuplicates: true }
+        )
         setShowOpening(true)
       }
     })
