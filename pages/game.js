@@ -44,7 +44,16 @@ const SCENE_FALLBACK = {
   bedroom: '#1a1018', outside: '#0f1018',
 }
 
-const CHARACTER_IMAGE = '/assets/characters/lu_default.png'
+const CHARACTER_IMAGES = {
+  default:   '/assets/characters/lu_default.png',
+  shy:       '/assets/characters/lu_shy.png',      // 腻歪/一起洗
+  intense:   '/assets/characters/lu_intense.png',  // 亲密进行
+  aftercare: '/assets/characters/lu_aftercare.png',// 余温
+}
+// 占位：图片不存在时fallback到default
+function getCharImg(key) {
+  return CHARACTER_IMAGES[key] || CHARACTER_IMAGES.default
+}
 
 function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace) {
   const sameRoom = playerRoom === luRoom
@@ -204,7 +213,7 @@ export default function Game() {
     const msgsToSend = isInit
       ? [{ role: 'user', content: userText }]
       : [...currentMsgs, { role: 'user', content: userText }]
-
+    let rawReply = ''
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -212,7 +221,7 @@ export default function Game() {
         body: JSON.stringify({ systemPrompt, messages: msgsToSend }),
       })
       const data = await res.json()
-      const rawReply = data.choices?.[0]?.message?.content || '···'
+      rawReply = data.choices?.[0]?.message?.content || '···'
       console.log('AI rawReply:', rawReply)
 
       const tagMatch = rawReply.match(/\[(\+\d)\]/)
@@ -251,6 +260,7 @@ export default function Game() {
       }
     } catch (e) { console.error(e) }
     setLoading(false)
+    return rawReply || ''
   }
 
   function handleSend() {
@@ -517,31 +527,49 @@ export default function Game() {
 
         {/* 输入区 + 破次元立绘 */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          {sameRoom && !isOutside && (
-            <div style={{
-              position: 'absolute',
-              bottom: '10px', left: '-4px',
-              width: '90px', height: '130px',
-              zIndex: 50, pointerEvents: 'none',
-              opacity: luMoving ? 0 : 1,
-              transition: 'opacity 0.4s',
-              animation: luMoving ? 'none' : 'breathe 4s ease-in-out infinite',
-            }}>
-              {luImgLoaded ? (
-                <img src={CHARACTER_IMAGE} alt="陆绍桓"
+          {sameRoom && !isOutside && (() => {
+            // 立绘状态判断
+            const charState =
+              intimatePhase === 'game' ? 'intense' :
+              intimatePhase === 'aftercare' ? 'aftercare' :
+              (bathPhase === 'active' || expandedAction === 'niwai') ? 'shy' :
+              'default'
+            const imgSrc = getCharImg(charState)
+            // CSS滤镜占位（图片不存在时靠这撑着，图片有了自动生效）
+            const imgFilter =
+              charState === 'shy' ? 'saturate(1.1) brightness(1.05)' :
+              charState === 'intense' ? 'saturate(0.9) brightness(0.9) contrast(1.1)' :
+              charState === 'aftercare' ? 'saturate(0.8) brightness(1.1)' :
+              'none'
+            return (
+              <div style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '-32px',  // 往左移，探出感更强
+                width: '90px', height: '130px',
+                zIndex: 50, pointerEvents: 'none',
+                opacity: luMoving ? 0 : 1,
+                transition: 'opacity 0.4s, filter 0.5s',
+                animation: luMoving ? 'none' : 'breathe 4s ease-in-out infinite',
+                filter: imgFilter,
+              }}>
+                <img
+                  src={imgSrc}
+                  alt="陆绍桓"
+                  onError={e => { if (imgSrc !== CHARACTER_IMAGES.default) e.target.src = CHARACTER_IMAGES.default }}
                   style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'bottom center' }}
                 />
-              ) : (
-                <div style={{
-                  width: '100%', height: '100%',
-                  background: 'linear-gradient(to top, rgba(201,169,110,0.07), transparent)',
-                  display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '6px',
-                }}>
-                  <span style={{ color: 'rgba(201,169,110,0.2)', fontSize: '11px' }}>陆</span>
-                </div>
-              )}
-            </div>
-          )}
+                {/* 害羞状态：粉色晕染叠层（无图时的视觉提示） */}
+                {charState === 'shy' && (
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'radial-gradient(ellipse at 60% 35%, rgba(255,180,160,0.12) 0%, transparent 70%)',
+                    pointerEvents: 'none',
+                  }} />
+                )}
+              </div>
+            )
+          })()}
 
 
           {/* ── 互动按钮行 + 输入框 ── */}
@@ -797,9 +825,14 @@ export default function Game() {
                     </div>
                     {/* 一起洗：需同处 */}
                     {sameRoom && (
-                      <button onClick={() => {
+                      <button onClick={async () => {
                         setBathPhase('asking')
-                        sendToAI('她问陆绍桓要不要一起洗，他的回应，如果愿意回复里自然包含❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                        const reply = await sendToAI('她问陆绍桓要不要一起洗，他的回应，如果愿意回复里自然包含❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                        if (reply && reply.includes('❤️')) {
+                          setBathPhase('active')
+                        } else {
+                          setBathPhase('declined')
+                        }
                       }} style={{ padding: '6px 16px', background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)', borderRadius: '20px', color: 'rgba(201,169,110,0.8)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif', marginTop: '2px' }}
                       >一起洗？</button>
                     )}
@@ -811,11 +844,10 @@ export default function Game() {
                     <button onClick={() => setBathPhase('idle')} style={{ marginLeft: '10px', background: 'none', border: 'none', color: 'rgba(201,169,110,0.3)', cursor: 'pointer', fontSize: '11px' }}>取消</button>
                   </div>
                 )}
-                {bathPhase === 'agreed' && (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => { setBathPhase('active'); sendToAI('你们确定一起洗了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                      style={{ flex: 1, padding: '8px', background: 'rgba(201,169,110,0.12)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '10px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer' }}>一起进去</button>
-                    <button onClick={() => setBathPhase('idle')} style={{ padding: '8px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer' }}>算了</button>
+                {bathPhase === 'declined' && (
+                  <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                    <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>今天先各自</div>
+                    <button onClick={() => setBathPhase('idle')} style={{ padding: '5px 14px', background: 'none', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.4)', fontSize: '11px', cursor: 'pointer' }}>好</button>
                   </div>
                 )}
                 {bathPhase === 'active' && (
@@ -832,10 +864,15 @@ export default function Game() {
                         >{a.label}</button>
                       ))}
                     </div>
-                    {intimacy >= 50 && intimatePhase === 'idle' && (
-                      <button onClick={() => {
+                    {intimacy >= 60 && intimatePhase === 'idle' && (
+                      <button onClick={async () => {
                         setIntimatePhase('asking')
-                        sendToAI('你们一起在浴室里，她想要更进一步，陆绍桓自然地回应，如果愿意带❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                        const reply = await sendToAI('你们一起在浴室里，她想要更进一步，陆绍桓自然地回应，如果愿意带❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                        if (reply && reply.includes('❤️')) {
+                          setIntimatePhase('agreed')
+                        } else {
+                          setIntimatePhase('declined')
+                        }
                       }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.2)', borderRadius: '20px', color: 'rgba(201,169,110,0.8)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>再近一点</button>
                     )}
                     <button onClick={() => { setBathPhase('idle'); sendToAI('洗澡结束了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
@@ -877,14 +914,19 @@ export default function Game() {
                         >{a.label}</button>
                       ))}
                     </div>
-                    {romantic >= 60 && sameRoom && intimacy >= 50 ? (
-                      <button onClick={() => {
+                    {romantic >= 60 && sameRoom && intimacy >= 60 ? (
+                      <button onClick={async () => {
                         setIntimatePhase('asking')
-                        sendToAI('卧室里气氛很好，她主动靠近你，你感觉到了她的意思，自然地回应，如果愿意带❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                        const reply = await sendToAI('卧室里气氛很好，她主动靠近你，你感觉到了她的意思，自然地回应，如果愿意带❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                        if (reply && reply.includes('❤️')) {
+                          setIntimatePhase('agreed')
+                        } else {
+                          setIntimatePhase('declined')
+                        }
                       }} style={{ padding: '6px 16px', background: 'rgba(201,169,110,0.15)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '20px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>再近一点</button>
                     ) : (
                       <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.25)', marginTop: '4px' }}>
-                        {!sameRoom ? '他不在这里' : romantic < 60 ? `浪漫值 ${romantic}/60` : `好感度需要50以上`}
+                        {!sameRoom ? '他不在这里' : romantic < 60 ? `浪漫值 ${romantic}/60` : `好感度需要60以上`}
                       </div>
                     )}
                   </>
@@ -894,40 +936,54 @@ export default function Game() {
                     <button onClick={() => setIntimatePhase('idle')} style={{ marginLeft: '10px', background: 'none', border: 'none', color: 'rgba(201,169,110,0.3)', cursor: 'pointer', fontSize: '11px' }}>取消</button>
                   </div>
                 )}
+                {intimatePhase === 'declined' && (
+                  <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                    <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>今天还不行</div>
+                    <button onClick={() => setIntimatePhase('idle')} style={{ padding: '5px 14px', background: 'none', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.4)', fontSize: '11px', cursor: 'pointer' }}>好</button>
+                  </div>
+                )}
                 {intimatePhase === 'agreed' && (
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => { setIntimatePhase('game'); sendToAI('你们决定了，描述这个时刻的开始，用第一人称，克制温柔', messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                      style={{ flex: 1, padding: '8px', background: 'rgba(201,169,110,0.12)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '10px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer' }}>继续</button>
+                    <button onClick={() => { setIntimatePhase('game'); sendToAI('你们决定了，描述这个时刻的开始，第一人称，克制温柔，情绪细腻，不超过4句', messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
+                      style={{ flex: 1, padding: '8px', background: 'rgba(201,169,110,0.12)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '10px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>继续</button>
                     <button onClick={() => setIntimatePhase('idle')} style={{ padding: '8px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer' }}>算了</button>
                   </div>
                 )}
                 {intimatePhase === 'game' && (
                   <>
-                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>氛围进行中</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px', letterSpacing: '0.1em' }}>
+                      {playerRoom === 'bathroom' ? '浴室 · 进行中' : '卧室 · 进行中'}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                       {[
-                        { label: '慢一点', prompt: '她说慢一点，他的回应' },
-                        { label: '抱紧我', prompt: '她说抱紧我，他的反应' },
-                        { label: '亲亲', prompt: '她想要他亲她，他的反应' },
-                        { label: '别停', prompt: '她说别停，他的反应，一句话' },
+                        { label: '慢一点', prompt: `她说慢一点，陆绍桓的回应，第一人称，克制深情，一两句` },
+                        { label: '抱紧我', prompt: `她说抱紧我，陆绍桓的反应，动作+一句话` },
+                        { label: '亲亲', prompt: `她想要他亲她，陆绍桓的反应，细腻感受` },
+                        { label: '别停', prompt: `她说别停，陆绍桓的回应，第一人称，沉溺其中` },
+                        { label: '看着我', prompt: `她说看着我，陆绍桓低头看她，说一句话，眼神和情绪都写出来` },
                       ].map(a => (
                         <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
                           style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
-                    <button onClick={() => { setIntimatePhase('aftercare'); setRomantic(0); sendToAI('结束了，他温柔地陪着她，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                      style={{ marginTop: '8px', padding: '6px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>结束</button>
+                    <button onClick={() => {
+                      setIntimatePhase('aftercare')
+                      if (playerRoom === 'bathroom') setBathPhase('idle')
+                      setRomantic(0)
+                      sendToAI('结束了，陆绍桓温柔地陪着她，余温里说一句，不急不躁', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                    }} style={{ padding: '6px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>结束</button>
                   </>
                 )}
                 {intimatePhase === 'aftercare' && (
                   <>
-                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>余温还在</div>
+                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', marginBottom: '8px', letterSpacing: '0.12em' }}>余温 · 还在</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       {[
-                        { label: '抱着睡', prompt: '她窝在他怀里想睡着，他说一句' },
-                        { label: '说说话', prompt: '事后她靠着他，说了句什么，他的回应' },
-                        { label: '亲额头', prompt: '他轻轻亲了她额头，她的感受，一句话' },
+                        { label: '抱着睡', prompt: '她窝在陆绍桓怀里，快要睡着，他轻轻说一句，声音低沉温柔' },
+                        { label: '说说话', prompt: '事后两人静静靠着，她先开口说了句什么，他的回应，克制里有温柔' },
+                        { label: '亲额头', prompt: '陆绍桓在余温里轻轻亲了她的额头，带点不自知的温柔，写他的动作和内心一句话' },
+                        { label: '他先睡', prompt: '陆绍桓慢慢闭上眼，她看着他，描述这一刻' },
                       ].map(a => (
                         <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
                           style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px', color: 'rgba(201,169,110,0.6)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
