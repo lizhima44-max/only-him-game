@@ -208,6 +208,30 @@ export default function Game() {
   const [isAiTurn, setIsAiTurn] = useState(false)
   const [selAct, setSelAct] = useState('kiss_lip')
   const [bathAftercare, setBathAftercare] = useState(false) // 浴室专属余温
+  // ── 冰箱食材 ──
+  const [fridge, setFridge] = useState({
+    '鸡蛋': 6, '牛奶': 1, '番茄': 3, '面条': 2, '猪肉': 1,
+    '豆腐': 2, '青菜': 3, '大蒜': 1, '米': 1, '奶酪': 1,
+  })
+  // ── 书房 ──
+  const [bookList, setBookList] = useState([
+    { title: '围城', author: '钱钟书' },
+    { title: '倾城之恋', author: '张爱玲' },
+    { title: '活着', author: '余华' },
+    { title: '人类简史', author: '赫拉利' },
+    { title: '小王子', author: '圣埃克苏佩里' },
+  ])
+  const [diaryList, setDiaryList] = useState([])       // 他写的日记列表
+  const [showFridge, setShowFridge] = useState(false)
+  const [showBooks, setShowBooks] = useState(false)
+  const [showDiary, setShowDiary] = useState(false)
+  const [showAddBook, setShowAddBook] = useState(false)
+  const [newBookTitle, setNewBookTitle] = useState('')
+  const [viewingDiary, setViewingDiary] = useState(null)
+  // ── 卧室 ──
+  const [candleLit, setCandleLit] = useState(false)    // 蜡烛是否点燃
+  // ── 上下文摘要 ──
+  const [memoryBlock, setMemoryBlock] = useState('')   // 压缩后的记忆块
   const aiTimerRef = useRef(null)
 
   useEffect(() => {
@@ -283,7 +307,11 @@ export default function Game() {
 
   async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit = false, uid, isSystem = false) {
     setLoading(true)
-    const systemPrompt = getSystemPrompt(curIntimacy, pRoom, lRoom, outsidePlace)
+    // 把记忆块注入到系统提示里
+    const basePrompt = getSystemPrompt(curIntimacy, pRoom, lRoom, outsidePlace)
+    const systemPrompt = memoryBlock
+      ? `${basePrompt}\n\n【过往记忆摘要】\n${memoryBlock}`
+      : basePrompt
     const msgsToSend = isInit
       ? [{ role: 'user', content: userText }]
       : [...currentMsgs, { role: 'user', content: userText }]
@@ -296,7 +324,6 @@ export default function Game() {
       })
       const data = await res.json()
       rawReply = data.choices?.[0]?.message?.content || '···'
-      console.log('AI rawReply:', rawReply)
 
       const tagMatch = rawReply.match(/\[(\+\d)\]/)
       const scoreTag = tagMatch ? parseInt(tagMatch[1]) : 1
@@ -308,11 +335,19 @@ export default function Game() {
         .trim()
 
       const newIntimacy = Math.min(100, curIntimacy + scoreTag)
-      const newMsgs = isInit || isSystem
+      let newMsgs = isInit || isSystem
         ? [...currentMsgs, { role: 'assistant', content: reply }]
         : [...currentMsgs, { role: 'user', content: userText }, { role: 'assistant', content: reply }]
 
-      setMessages(newMsgs)
+      // 超过24条时触发压缩（异步，不阻塞渲染）
+      if (newMsgs.length >= 24) {
+        maybeSummarize(newMsgs).then(compressed => {
+          setMessages(compressed)
+          saveToDb(compressed, newIntimacy, pRoom, lRoom, uid || userId)
+        })
+      } else {
+        setMessages(newMsgs)
+      }
       setIntimacy(newIntimacy)
 
       if (moveTarget && moveTarget !== lRoom) {
@@ -320,11 +355,12 @@ export default function Game() {
         const canMove = targetRoom && (targetRoom.luCanFreely || newIntimacy >= (targetRoom.unlockAt || 0))
         if (canMove) {
           setLuMoving(true)
+          // 修复：直接setLuRoom而不依赖异步，确保人真的过来
+          setLuRoom(moveTarget)
           setTimeout(() => {
-            setLuRoom(moveTarget)
             setLuMoving(false)
             setToast(`· 他去了${targetRoom.name}`)
-            saveToDb(newMsgs, newIntimacy, pRoom, moveTarget, uid || userId)
+          }, 700)            saveToDb(newMsgs, newIntimacy, pRoom, moveTarget, uid || userId)
           }, 700)
         } else {
           await saveToDb(newMsgs, newIntimacy, pRoom, lRoom, uid)
@@ -531,6 +567,48 @@ export default function Game() {
     if (bathAftercare) setBathPhase('idle')
   }
 
+  // ── 上下文压缩：超过20条时总结前半段 ──
+  async function maybeSummarize(msgs) {
+    if (msgs.length < 24) return msgs
+    const toCompress = msgs.slice(0, msgs.length - 10)
+    const recent = msgs.slice(msgs.length - 10)
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemPrompt: '你是一个记忆助手，用中文提炼对话摘要。输出两部分：【重要】列出角色关系进展、重要事件、已达成的状态（各一句）；【细节】列出有趣细节、她的喜好、他说过的话（各一句）。总共不超过150字。',
+          messages: [{ role: 'user', content: '请总结以下对话：\n' + toCompress.map(m => `${m.role === 'user' ? '她' : '他'}：${m.content}`).join('\n') }],
+        }),
+      })
+      const data = await res.json()
+      const summary = data.choices?.[0]?.message?.content || ''
+      if (summary) {
+        setMemoryBlock(prev => (prev ? prev + '\n---\n' : '') + summary)
+        return recent
+      }
+    } catch (e) { console.error(e) }
+    return msgs
+  }
+
+  // ── 写日记 ──
+  async function writeDiary() {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemPrompt: '你是陆绍桓，在书房独自写日记，写关于她的内心独白，不让她看到的那种，2-4句，第一人称，克制但藏不住',
+        messages: [{ role: 'user', content: '写今天的日记' }],
+      }),
+    })
+    const data = await res.json()
+    const entry = data.choices?.[0]?.message?.content || ''
+    if (entry) {
+      const date = new Date().toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
+      setDiaryList(prev => [...prev, { date, content: entry }])
+    }
+  }
+
   const sameRoom = playerRoom === luRoom
   const isOutside = playerRoom === 'outside'
   const currentRoom = ROOMS.find(r => r.id === playerRoom)
@@ -554,6 +632,14 @@ export default function Game() {
         }
         .action-row { scrollbar-width: none; }
         .action-row::-webkit-scrollbar { display: none; }
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover,
+        input:-webkit-autofill:focus {
+          -webkit-box-shadow: 0 0 0 1000px #12100e inset !important;
+          -webkit-text-fill-color: #e8dcc8 !important;
+          caret-color: #e8dcc8;
+        }
+        select, option { background: #12100e !important; color: #e8dcc8 !important; }
       `}</style>
       <div style={{
         position: 'fixed', inset: 0,
@@ -818,12 +904,13 @@ export default function Game() {
                     { label: '发呆', prompt: '她在客厅发呆，你看见了，说一句' },
                   ],
                   kitchen: [
-                    { label: '一起做饭', prompt: '她叫你一起进厨房做饭，你的反应，一句话' },
-                    { label: '蹭饭', prompt: '她在做饭你凑过去蹭了一口，说一句' },
+                    { label: '一起做饭', special: 'cook' },
+                    { label: '冰箱', special: 'fridge' },
                   ],
                   study: [
-                    { label: '借书', prompt: '她进书房想借本书，你抬头看了她一眼，说一句' },
+                    { label: '看书', special: 'books' },
                     { label: '打扰他', prompt: '她故意进书房打扰你，你的反应，一句话' },
+                    { label: '他的日记', special: 'diary' },
                   ],
                   balcony: [
                     { label: '看星星', prompt: '她在阳台看星星，你跟出来了，说一句' },
@@ -851,16 +938,32 @@ export default function Game() {
                 })
                 return (
                   <>
-                    {acts.map(a => (
-                      <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                        style={btnStyle()}
-                      >{a.label}</button>
-                    ))}
-                    {/* 书房：日记本（不需要同处，是他自己的日记） */}
-                    {playerRoom === 'study' && (
-                      <button onClick={() => {
-                        sendToAI('你在书房，写一篇关于她的日记（你自己的内心独白，不让她看到的那种），2-4句，第一人称，克制但藏不住', messages, intimacy, playerRoom, luRoom, false, undefined, true)
-                      }} style={btnStyle()}>他的日记</button>
+                    {acts.map(a => {
+                      if (a.special === 'fridge') return (
+                        <button key="fridge" onClick={() => setShowFridge(true)} style={btnStyle()}>冰箱</button>
+                      )
+                      if (a.special === 'cook') return (
+                        <button key="cook" onClick={() => setShowFridge('cook')} style={btnStyle()}>一起做饭</button>
+                      )
+                      if (a.special === 'books') return (
+                        <button key="books" onClick={() => setShowBooks(true)} style={btnStyle()}>看书</button>
+                      )
+                      if (a.special === 'diary') return (
+                        <button key="diary" onClick={() => setShowDiary(true)} style={btnStyle()}>他的日记</button>
+                      )
+                      return (
+                        <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
+                          style={btnStyle()}
+                        >{a.label}</button>
+                      )
+                    })}
+                    {/* 书房：他在这里可以写日记 */}
+                    {playerRoom === 'study' && luRoom === 'study' && (
+                      <button onClick={async () => {
+                        setToast('他在写…')
+                        await writeDiary()
+                        setToast('写完了')
+                      }} style={btnStyle()}>写日记</button>
                     )}
                     {/* 浴室：入口，不需要同处（自己在浴室也可以） */}
                     {playerRoom === 'bathroom' && (
@@ -1152,12 +1255,12 @@ export default function Game() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '4px' }}>
                     <span>浪漫值</span>
                     <span>
-                      {romantic}/60
-                      {totalWk > 0 && <span style={{ marginLeft: '8px', color: 'rgba(201,169,110,0.2)', fontSize: '9px' }}>×{totalWk}</span>}
+                      {romantic}/100
+                      {totalWk > 0 && <span style={{ marginLeft: '8px', color: 'rgba(201,169,110,0.2)', fontSize: '9px' }}>亲密×{totalWk}</span>}
                     </span>
                   </div>
                   <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${romantic}%`, background: 'linear-gradient(to right, rgba(201,169,110,0.4), rgba(201,169,110,0.8))', borderRadius: '4px', transition: 'width 0.4s' }} />
+                    <div style={{ height: '100%', width: `${Math.min(100, romantic)}%`, background: 'linear-gradient(to right, rgba(201,169,110,0.4), rgba(201,169,110,0.8))', borderRadius: '4px', transition: 'width 0.4s' }} />
                   </div>
                 </div>
 
@@ -1165,10 +1268,23 @@ export default function Game() {
                   <>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                       {[
-                        { label: '点蜡烛', action: () => { setRomantic(n => Math.min(100, n + 20)); sendToAI('她点上了蜡烛，你注意到了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
-                        { label: '营造气氛', action: () => { setRomantic(n => Math.min(100, n + 10)); sendToAI('她在营造浪漫气氛，你感觉到了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
-                        { label: '靠着你', action: () => sendToAI('她在卧室靠在你身边，你感觉到了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true) },
-                        { label: '说晚安', action: () => sendToAI('她说晚安，你的回应，一句话', messages, intimacy, playerRoom, luRoom, false, undefined, true) },
+                        {
+                          label: candleLit ? '吹蜡烛 🕯️' : '点蜡烛 🕯️',
+                          action: () => {
+                            if (!candleLit) {
+                              setCandleLit(true)
+                              setRomantic(n => Math.min(100, n + 20))
+                              sendToAI('她点上了蜡烛，烛光摇曳，你注意到了，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                            } else {
+                              setCandleLit(false)
+                              sendToAI('她把蜡烛吹灭了，黑暗里只剩余温，你说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                            }
+                          }
+                        },
+                        { label: '轻吻他', action: () => { setRomantic(n => Math.min(100, n + 15)); sendToAI('她轻轻吻了他，他的反应，第一人称，克制', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
+                        { label: '抱住他', action: () => { setRomantic(n => Math.min(100, n + 12)); sendToAI('她从背后抱住他，他感觉到了，说一句，声音低', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
+                        { label: '亲脖子', action: () => { setRomantic(n => Math.min(100, n + 18)); sendToAI('她踮脚亲了他的脖子，他一顿，第一人称写他的反应', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
+                        { label: '摸他头发', action: () => { setRomantic(n => Math.min(100, n + 10)); sendToAI('她轻轻摸了摸他的头发，他的反应，一句话', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
                       ].map(a => (
                         <button key={a.label} onClick={() => a.action()}
                           style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
@@ -1274,7 +1390,7 @@ export default function Game() {
                         { label: '说说话', prompt: '浴室里，水声停了，两个人靠着，她先开口，他的回应' },
                       ] : [
                         { label: '抱着睡', prompt: '她窝在他怀里，快要睡着，他轻轻说一句，声音低沉温柔' },
-                        { label: '说说话', prompt: '事后两人静静靠着，她先开口，他的回应，克制里有温柔' },
+                        { label: '黏着他', prompt: '事后她黏着他不放，他假装嫌弃但没动，写他的动作和一句话' },
                         { label: '亲额头', prompt: '他在余温里轻轻亲了她的额头，带点不自知的温柔，写动作和内心一句话' },
                         { label: '说晚安', prompt: '她说晚安，他的回应，余温里的一句话，低沉温柔' },
                       ]).map(a => (
@@ -1295,7 +1411,7 @@ export default function Game() {
                           setIntimatePhase('agreed')
                         }} style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.2)', borderRadius: '20px', color: 'rgba(201,169,110,0.6)', fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>还要</button>
                       )}
-                      <button onClick={resetIntimFull} style={{ padding: '5px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', color: 'rgba(255,255,255,0.15)', fontSize: '11px', cursor: 'pointer' }}>
+                      <button onClick={() => { resetIntimFull(); setCandleLit(false) }} style={{ padding: '5px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', color: 'rgba(255,255,255,0.15)', fontSize: '11px', cursor: 'pointer' }}>
                         {bathAftercare ? '离开浴室' : '结束余温'}
                       </button>
                     </div>
@@ -1466,6 +1582,127 @@ export default function Game() {
                 cursor: 'pointer', fontFamily: 'Georgia, serif', letterSpacing: '0.08em',
               }}>加进去</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ 冰箱弹窗（查看食材 / 选菜谱） ══ */}
+      {showFridge && (() => {
+        const RECIPES = [
+          { name: '番茄炒蛋', need: { '番茄': 2, '鸡蛋': 2 }, prompt: '她做了番茄炒蛋，端上来，你尝了一口，说一句' },
+          { name: '葱油面',   need: { '面条': 1, '大蒜': 1 }, prompt: '她煮了碗葱油面，香气飘过来，你说一句' },
+          { name: '豆腐汤',   need: { '豆腐': 1, '青菜': 1 }, prompt: '她煮了豆腐汤，盛了两碗，你接过那碗，说一句' },
+          { name: '猪肉炒青菜', need: { '猪肉': 1, '青菜': 1 }, prompt: '她炒了道荤菜，你站在旁边看了会儿，说一句' },
+          { name: '奶酪煎蛋', need: { '鸡蛋': 2, '奶酪': 1 }, prompt: '她用奶酪煎了个鸡蛋，有点洋气，你挑眉说一句' },
+        ]
+        const isCook = showFridge === 'cook'
+        const canMake = (recipe) => Object.entries(recipe.need).every(([k, v]) => (fridge[k] || 0) >= v)
+        return (
+          <div onClick={() => setShowFridge(false)} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'rgba(10,7,4,0.97)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '70vh', overflowY: 'auto' }}>
+              <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', letterSpacing: '0.2em', marginBottom: '14px' }}>{isCook ? '一起做饭 · 选菜谱' : '冰箱 · 食材'}</div>
+              {!isCook ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '8px' }}>
+                  {Object.entries(fridge).map(([name, qty]) => (
+                    <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: qty > 0 ? 'rgba(201,169,110,0.06)' : 'rgba(255,255,255,0.02)', border: '1px solid rgba(201,169,110,0.1)', borderRadius: '10px' }}>
+                      <span style={{ fontSize: '13px', color: qty > 0 ? '#e8dcc8' : 'rgba(255,255,255,0.2)' }}>{name}</span>
+                      <span style={{ fontSize: '13px', color: qty > 0 ? 'rgba(201,169,110,0.7)' : 'rgba(255,255,255,0.15)' }}>×{qty}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {RECIPES.map(r => {
+                    const ok = canMake(r)
+                    return (
+                      <button key={r.name} disabled={!ok} onClick={() => {
+                        setFridge(prev => {
+                          const next = { ...prev }
+                          Object.entries(r.need).forEach(([k, v]) => { next[k] = Math.max(0, (next[k] || 0) - v) })
+                          return next
+                        })
+                        setShowFridge(false)
+                        sendToAI(r.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                      }} style={{ padding: '12px 14px', background: ok ? 'rgba(201,169,110,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${ok ? 'rgba(201,169,110,0.25)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '12px', cursor: ok ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'Georgia,serif' }}>
+                        <div style={{ fontSize: '14px', color: ok ? '#e8dcc8' : 'rgba(255,255,255,0.2)', marginBottom: '4px' }}>{r.name}</div>
+                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>
+                          {Object.entries(r.need).map(([k, v]) => `${k}×${v}`).join('  ')}
+                          {!ok && <span style={{ color: 'rgba(255,100,100,0.4)', marginLeft: '6px' }}>食材不足</span>}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ══ 看书弹窗 ══ */}
+      {showBooks && (
+        <div onClick={() => { setShowBooks(false); setShowAddBook(false) }} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'rgba(10,7,4,0.97)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', letterSpacing: '0.2em' }}>书架</div>
+              <button onClick={() => setShowAddBook(!showAddBook)} style={{ fontSize: '11px', background: 'none', border: '1px solid rgba(201,169,110,0.2)', color: 'rgba(201,169,110,0.5)', padding: '4px 12px', borderRadius: '20px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>+ 添加</button>
+            </div>
+            {showAddBook && (
+              <div style={{ marginBottom: '12px', display: 'flex', gap: '8px' }}>
+                <input value={newBookTitle} onChange={e => setNewBookTitle(e.target.value)} placeholder='书名（作者可选）' style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '10px', padding: '8px 12px', color: '#e8dcc8', fontSize: '12px', outline: 'none', fontFamily: 'Georgia,serif' }} />
+                <button onClick={() => {
+                  if (!newBookTitle.trim()) return
+                  const parts = newBookTitle.split(' ')
+                  setBookList(prev => [...prev, { title: parts[0], author: parts[1] || '' }])
+                  setNewBookTitle('')
+                  setShowAddBook(false)
+                }} style={{ padding: '8px 14px', background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)', borderRadius: '10px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>加入</button>
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {bookList.map((b, i) => (
+                <button key={i} onClick={() => {
+                  setShowBooks(false)
+                  sendToAI(`她拿起《${b.title}》看了起来${b.author ? `（${b.author}写的）` : ''}，你注意到了，发表一句评价或问她看到哪里了`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                }} style={{ padding: '10px 14px', background: 'rgba(201,169,110,0.05)', border: '1px solid rgba(201,169,110,0.1)', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Georgia,serif' }}>
+                  <span style={{ fontSize: '14px', color: '#e8dcc8' }}>《{b.title}》</span>
+                  {b.author && <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', marginLeft: '8px' }}>{b.author}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ 日记弹窗 ══ */}
+      {showDiary && (
+        <div onClick={() => { setShowDiary(false); setViewingDiary(null) }} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'rgba(10,7,4,0.97)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto' }}>
+            {viewingDiary !== null ? (
+              <>
+                <button onClick={() => setViewingDiary(null)} style={{ fontSize: '11px', background: 'none', border: 'none', color: 'rgba(201,169,110,0.4)', cursor: 'pointer', marginBottom: '12px', fontFamily: 'Georgia,serif' }}>← 返回</button>
+                <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.3)', marginBottom: '10px' }}>{diaryList[viewingDiary]?.date}</div>
+                <div style={{ fontSize: '14px', color: '#e8dcc8', lineHeight: 1.9, fontStyle: 'italic' }}>{diaryList[viewingDiary]?.content}</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', letterSpacing: '0.2em', marginBottom: '14px' }}>
+                  他的日记 · {diaryList.length > 0 ? `共${diaryList.length}篇` : '无记录'}
+                </div>
+                {diaryList.length === 0 ? (
+                  <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.15)', textAlign: 'center', padding: '20px 0' }}>他还没写过</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {diaryList.map((d, i) => (
+                      <button key={i} onClick={() => setViewingDiary(i)} style={{ padding: '10px 14px', background: 'rgba(201,169,110,0.05)', border: '1px solid rgba(201,169,110,0.1)', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Georgia,serif' }}>
+                        <span style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', marginRight: '10px' }}>{d.date}</span>
+                        <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.45)', fontStyle: 'italic' }}>{d.content.slice(0, 20)}…</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
