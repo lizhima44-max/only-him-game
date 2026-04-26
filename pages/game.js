@@ -202,6 +202,7 @@ export default function Game() {
       })
       const data = await res.json()
       const rawReply = data.choices?.[0]?.message?.content || '···'
+      console.log('AI rawReply:', rawReply)
 
       const tagMatch = rawReply.match(/\[(\+\d)\]/)
       const scoreTag = tagMatch ? parseInt(tagMatch[1]) : 1
