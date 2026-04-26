@@ -150,11 +150,7 @@ export default function Game() {
     })
   }, [])
 
-  useEffect(() => {
-    if (initialized && messages.length === 0) {
-      sendToAI('（她第一次回到客厅，你主动开口，一句话，自然克制）', [], 0, 'living_room', 'living_room', true)
-    }
-  }, [initialized])
+  // 新用户第一句话由「进门」按钮直接触发，不在此处理
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -331,7 +327,7 @@ export default function Game() {
   if (showOpening) {
     return (
       <div style={{
-        minHeight: '100vh', background: '#0f0c09',
+        position: 'fixed', inset: 0, background: '#0f0c09',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         fontFamily: 'Georgia, serif', padding: '40px 30px', textAlign: 'center',
@@ -343,7 +339,12 @@ export default function Game() {
         <div style={{ color: '#4a3a28', fontSize: '13px', fontStyle: 'italic', letterSpacing: '0.1em', marginBottom: '60px' }}>
           He said he was just passing through.
         </div>
-        <button onClick={() => { setShowOpening(false); setInitialized(true) }} style={{
+        <button onClick={async () => {
+          // 先让AI说第一句，等回来了再进主界面
+          setInitialized(true)
+          await sendToAI('（她第一次回到客厅，你主动开口，一句话，自然克制）', [], 0, 'living_room', 'living_room', true)
+          setShowOpening(false)
+        }} style={{
           background: 'transparent', border: '1px solid #2a1a10',
           color: '#6a5a40', padding: '12px 40px', fontSize: '12px',
           letterSpacing: '0.2em', cursor: 'pointer', fontFamily: 'Georgia, serif',
@@ -354,17 +355,25 @@ export default function Game() {
 
   // ── 主界面 ──
   return (
-    <div style={{
-      position: 'relative', width: '100%', maxWidth: '480px', margin: '0 auto',
-      height: '100dvh', overflow: 'hidden', fontFamily: 'Georgia, serif',
-    }}>
+    <>
       <style>{`
+        html, body { margin: 0; padding: 0; overflow: hidden; background: #0f0c09; }
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes breathe {
           0%,100% { transform: translateY(0px) scale(1); opacity:0.92; }
           50% { transform: translateY(-5px) scale(1.015); opacity:1; }
         }
       `}</style>
+      <div style={{
+        position: 'fixed', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#0f0c09',
+      }}>
+      <div style={{
+        position: 'relative', width: '100%', maxWidth: '480px', height: '100%',
+        overflow: 'hidden', fontFamily: 'Georgia, serif',
+      }}>
 
       {/* ── 第1层：场景背景 ── */}
       <div style={{
@@ -680,5 +689,8 @@ export default function Game() {
       )}
 
     </div>
+      </div>
+      </div>
+    </>
   )
 }
