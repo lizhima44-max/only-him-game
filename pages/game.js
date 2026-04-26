@@ -360,8 +360,8 @@ export default function Game() {
           setTimeout(() => {
             setLuMoving(false)
             setToast(`· 他去了${targetRoom.name}`)
-          }, 700)            saveToDb(newMsgs, newIntimacy, pRoom, moveTarget, uid || userId)
           }, 700)
+          saveToDb(newMsgs, newIntimacy, pRoom, moveTarget, uid || userId)
         } else {
           await saveToDb(newMsgs, newIntimacy, pRoom, lRoom, uid)
         }
