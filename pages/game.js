@@ -191,7 +191,7 @@ export default function Game() {
     })
     const charImg = new Image()
     charImg.onload = () => setLuImgLoaded(true)
-    charImg.src = CHARACTER_IMAGE
+    charImg.src = CHARACTER_IMAGES.default
   }, [])
 
   async function saveToDb(msgs, intim, pRoom, lRoom, uid) {
