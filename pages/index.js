@@ -149,7 +149,7 @@ export default function Home() {
           {/* 登录/注册 tab */}
           <div style={{
             display: 'flex', width: '100%', marginBottom: '24px',
-            border: '1px solid rgba(80,140,255,0.25)', borderRadius: '12px', overflow: 'hidden', background: 'rgba(8,12,35,0.6)',
+            border: '1px solid rgba(80,140,255,0.25)', borderRadius: '12px', overflow: 'hidden', background: 'rgba(115, 133, 236, 0.8)',
           }}>
             {['login', 'register'].map(m => (
               <button
@@ -176,7 +176,7 @@ export default function Home() {
               onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               style={{
                 width: '100%', padding: '13px 16px',
-                background: 'rgba(8,12,35,0.72)',
+                background: 'rgba(115, 133, 236, 0.8)',
                 border: '1px solid rgba(80,140,255,0.3)', borderRadius: '12px',
                 outline: 'none', color: 'rgba(220,235,255,0.95)',
                 fontSize: '14px', fontFamily: 'Georgia, serif', letterSpacing: '0.04em',
@@ -190,7 +190,7 @@ export default function Home() {
               onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               style={{
                 width: '100%', padding: '13px 16px',
-                background: 'rgba(8,12,35,0.72)',
+                background: 'rgba(115, 133, 236, 0.8)',
                 border: '1px solid rgba(80,140,255,0.3)', borderRadius: '12px',
                 outline: 'none', color: 'rgba(220,235,255,0.95)',
                 fontSize: '14px', fontFamily: 'Georgia, serif', letterSpacing: '0.08em',
@@ -246,7 +246,7 @@ export default function Home() {
             onClick={handleGoogleLogin}
             style={{
               width: '100%', padding: '13px',
-              background: 'rgba(255,255,255,0.03)',
+              background: 'rgba(255, 255, 255, 0.8)',
               border: '1px solid rgba(80,140,255,0.12)', borderRadius: '14px',
               cursor: 'pointer', color: 'rgba(180,215,255,0.6)',
               fontSize: '12px', letterSpacing: '0.14em', fontFamily: 'Georgia, serif',
