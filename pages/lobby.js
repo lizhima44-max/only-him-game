@@ -55,7 +55,6 @@ const CHARACTERS = [
 
 export default function Lobby() {
   const router = useRouter()
-  const canvasRef = useRef(null)
   const trackRef = useRef(null)
   const [activeIdx, setActiveIdx] = useState(1)
   const [showModal, setShowModal] = useState(false)
@@ -66,99 +65,6 @@ export default function Lobby() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) router.push('/')
     })
-  }, [])
-
-  // 星空 canvas
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    canvas.width = canvas.offsetWidth
-    canvas.height = canvas.offsetHeight
-    const W = canvas.width, H = canvas.height
-
-    const stars = Array.from({ length: 280 }, () => ({
-      x: Math.random() * W, y: Math.random() * H,
-      r: Math.random() * 1.8 + 0.2,
-      speed: 0.002 + Math.random() * 0.006,
-      phase: Math.random() * Math.PI * 2,
-    }))
-
-    const nebulae = [
-      { x: W*0.5, y: H*0.25, rx: 200, ry: 130, color: '40,100,255',  alpha: 0.07 },
-      { x: W*0.2, y: H*0.55, rx: 130, ry: 90,  color: '80,140,255',  alpha: 0.05 },
-      { x: W*0.8, y: H*0.65, rx: 110, ry: 80,  color: '60,120,255',  alpha: 0.04 },
-      { x: W*0.6, y: H*0.12, rx: 100, ry: 65,  color: '100,160,255', alpha: 0.04 },
-      { x: W*0.15, y: H*0.2, rx: 120, ry: 80,  color: '255,100,180', alpha: 0.04 },
-      { x: W*0.85, y: H*0.4, rx: 90,  ry: 70,  color: '220,80,160',  alpha: 0.035 },
-      { x: W*0.4,  y: H*0.8, rx: 150, ry: 90,  color: '255,120,200', alpha: 0.03 },
-    ]
-
-    const meteors = []
-    let meteorTimer = 0
-    function spawnMeteor() {
-      meteors.push({
-        x: Math.random() * (W - 40) + 20,
-        y: Math.random() * H * 0.4 + 10,
-        vx: 1.2 + Math.random() * 1.8,
-        vy: 0.4 + Math.random() * 0.8,
-        len: 40 + Math.random() * 60,
-        life: 1,
-        decay: 0.012 + Math.random() * 0.016,
-      })
-    }
-
-    let t = 0
-    function draw() {
-      ctx.clearRect(0, 0, W, H)
-      const bg = ctx.createRadialGradient(W/2, H*0.3, 0, W/2, H*0.5, H*0.8)
-      bg.addColorStop(0, 'rgba(8,10,28,1)')
-      bg.addColorStop(1, 'rgba(2,1,10,1)')
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H)
-
-      nebulae.forEach(n => {
-        const pulse = Math.sin(t * 0.25 + n.x * 0.01) * 0.35 + 0.65
-        const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.rx)
-        grad.addColorStop(0, `rgba(${n.color},${n.alpha * pulse * 2})`)
-        grad.addColorStop(0.5, `rgba(${n.color},${n.alpha * pulse})`)
-        grad.addColorStop(1, `rgba(${n.color},0)`)
-        ctx.save(); ctx.scale(1, n.ry / n.rx); ctx.fillStyle = grad
-        ctx.beginPath(); ctx.arc(n.x, n.y * (n.rx / n.ry), n.rx, 0, Math.PI * 2)
-        ctx.fill(); ctx.restore()
-      })
-
-      stars.forEach(s => {
-        const pulse = (Math.sin(t * s.speed * 8 + s.phase) + 1) / 2
-        const a = 0.12 + pulse * 0.88
-        const r = s.r * (0.75 + pulse * 0.5)
-        ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(180,220,255,${a})`; ctx.fill()
-        if (s.r > 1.2) {
-          ctx.beginPath(); ctx.arc(s.x, s.y, r * 2.5, 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(100,180,255,${a * 0.12})`; ctx.fill()
-        }
-      })
-
-      meteorTimer++
-      if (meteorTimer > 90 + Math.random() * 80) { spawnMeteor(); meteorTimer = 0 }
-      for (let i = meteors.length - 1; i >= 0; i--) {
-        const m = meteors[i]
-        const grad = ctx.createLinearGradient(m.x, m.y, m.x - m.vx*(m.len/5), m.y - m.vy*(m.len/5))
-        grad.addColorStop(0, `rgba(200,230,255,${m.life*0.9})`)
-        grad.addColorStop(0.4, `rgba(140,200,255,${m.life*0.4})`)
-        grad.addColorStop(1, 'rgba(100,180,255,0)')
-        ctx.strokeStyle = grad; ctx.lineWidth = m.life * 1.5
-        ctx.beginPath(); ctx.moveTo(m.x, m.y)
-        ctx.lineTo(m.x - m.vx*(m.len/5), m.y - m.vy*(m.len/5)); ctx.stroke()
-        m.x += m.vx; m.y += m.vy; m.life -= m.decay
-        if (m.life <= 0) meteors.splice(i, 1)
-      }
-
-      t += 0.016
-      animRef.current = requestAnimationFrame(draw)
-    }
-    draw()
-    return () => { if (animRef.current) cancelAnimationFrame(animRef.current) }
   }, [])
 
   // 滑动检测
@@ -241,9 +147,11 @@ export default function Lobby() {
           width: '100%', maxWidth: '480px', height: '100%',
           overflow: 'hidden', fontFamily: 'Georgia, serif',
         }}>
-          {/* 星空背景 */}
-          <canvas ref={canvasRef} style={{
-            position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0,
+          {/* 背景图 */}
+          <img src="/assets/lobby/lobby_bg.png" alt="" style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: 'center', zIndex: 0,
+            pointerEvents: 'none',
           }} />
 
           <div style={{

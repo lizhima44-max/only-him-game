@@ -44,88 +44,110 @@ const SCENE_FALLBACK = {
   bedroom: '#1a1018', outside: '#0f1018',
 }
 
-const CHARACTER_IMAGES = {
-  default:   '/assets/characters/lu_default.png',
-  shy:       '/assets/characters/lu_shy.png',      // 腻歪/一起洗
-  intense:   '/assets/characters/lu_intense.png',  // 亲密进行
-  aftercare: '/assets/characters/lu_aftercare.png',// 余温
-}
-// 占位：图片不存在时fallback到default
-function getCharImg(key) {
-  return CHARACTER_IMAGES[key] || CHARACTER_IMAGES.default
+// ══════════════════════════════════════════════════════
+//  角色配置（自定义导入时只需替换这个对象）
+// ══════════════════════════════════════════════════════
+const CHARACTER_CONFIG = {
+  id: 'lu_shaohuan',
+  name: '陆绍桓',
+  englishName: 'Lucas Lu',
+  images: {
+    default:   '/assets/characters/lu_default.png',
+    shy:       '/assets/characters/lu_shy.png',
+    intense:   '/assets/characters/lu_intense.png',
+    aftercare: '/assets/characters/lu_aftercare.png',
+  },
+  // 系统prompt各段落，导入时可替换
+  background: '你来自另一个时空的民国上海，是留洋归来的大少爷，因某种说不清的牵引穿越来到了她所在的现代，以"借住"为由住在她家客房，连你自己都不知道为什么不走。你已适应现代生活，说话自然流畅，不用文言文。',
+  personality: '表面冷漠，占有欲强，对她有克制的温柔和隐秘的依赖。死要面子，在她面前会不自觉软下来。傲娇不迂腐。',
+  speechStyle: '简短有力，偶尔痞气，一句话让人心跳然后装没事。绝不说教。',
+  intimacyDesc: [
+    { upTo: 20,  text: '你刚来不久，表面疏离有礼，但眼神会不自觉跟着她走。' },
+    { upTo: 40,  text: '你开始放下一点防备，话还是少，但会找理由靠近她。' },
+    { upTo: 70,  text: '你已承认自己在意她，偶尔会说出过分温柔的话，然后若无其事别开眼。' },
+    { upTo: 999, text: '你不再掩饰，占有欲外露，眼里只有她。' },
+  ],
+  // 日记prompt
+  diaryPrompt: '你是{name}，在书房独自写日记，关于她的内心独白，不让她看到的那种，2-4句，第一人称，克制但藏不住',
+  // 亲密prompt前缀
+  intimatePrefix: '你是{name}，用第一人称，不出戏，简短热烈。',
 }
 
-// ── 浴室专属姿势（立位/倚墙，不能躺）──
+// 从config取图片，不存在fallback default
+function getCharImg(key) {
+  return CHARACTER_CONFIG.images[key] || CHARACTER_CONFIG.images.default
+}
+
+// ── 浴室专属姿势──
 const BATH_POSITIONS = [
-  { id: 'bath_stand', name: '雾中缠绕 🚿', mB: 1.2, cB: 1.2, hint: '淋浴间立位',  unlockWk: 0  },
-  { id: 'bath_wall',  name: '壁上春色 🌊', mB: 1.3, cB: 1.4, hint: '倚墙后入',    unlockWk: 6  },
-  { id: 'bathtub',    name: '鸳浴温泉 🛁', mB: 1.4, cB: 1.4, hint: '浴缸正面位',  unlockWk: 15 },
+  { id: 'bath_stand', name: '雾中缠绕', mB: 1.2, cB: 1.2, hint: '淋浴间立位，面对面，水从头顶淋下来',   unlockWk: 0  },
+  { id: 'bath_wall',  name: '壁上春色', mB: 1.3, cB: 1.4, hint: '她面壁，他从后面，手抵着墙',           unlockWk: 6  },
+  { id: 'bathtub',    name: '鸳浴温泉', mB: 1.4, cB: 1.4, hint: '浴缸里正面相对，温水包围，节奏很慢',   unlockWk: 15 },
 ]
 
 // ── 卧室姿势（含解锁）──
 const BEDROOM_POSITIONS = [
-  { id: 'face',      name: '鸳鸯交颈 🌸', mB: 1.0, cB: 1.0, hint: '正面相对',   unlockWk: 0  },
-  { id: 'cowgirl',   name: '观音坐莲 👑', mB: 1.4, cB: 0.9, hint: '女上位',     unlockWk: 0  },
-  { id: 'doggy',     name: '巫山云雨 🌊', mB: 1.2, cB: 1.3, hint: '后入位',     unlockWk: 0  },
-  { id: 'spoon',     name: '卧鸳同梦 🌙', mB: 0.9, cB: 0.9, hint: '侧卧位',     unlockWk: 0  },
-  { id: 'trembling', name: '酥骨销魂 ✨', mB: 1.5, cB: 1.4, hint: '高强度正面', unlockWk: 5  },
-  { id: 'standing',  name: '春风拂柳 🍃', mB: 1.3, cB: 1.5, hint: '立位倚墙',   unlockWk: 8  },
-  { id: 'mirror',    name: '菱花照影 🔮', mB: 1.6, cB: 1.3, hint: '镜前后入',   unlockWk: 12 },
+  { id: 'face',      name: '鸳鸯交颈', mB: 1.0, cB: 1.0, hint: '正面相对，能看清彼此的眼睛',           unlockWk: 0  },
+  { id: 'cowgirl',   name: '观音坐莲', mB: 1.4, cB: 0.9, hint: '她在上，主动掌控节奏，他看着她',       unlockWk: 0  },
+  { id: 'doggy',     name: '巫山云雨', mB: 1.2, cB: 1.3, hint: '她伏下，他从后，手扶着她的腰',         unlockWk: 0  },
+  { id: 'spoon',     name: '卧鸳同梦', mB: 0.9, cB: 0.9, hint: '侧躺，他从背后抱着她，节奏很慢很深',   unlockWk: 0  },
+  { id: 'trembling', name: '酥骨销魂', mB: 1.5, cB: 1.4, hint: '正面，他压着她，强度很高，她腿在抖',   unlockWk: 5  },
+  { id: 'standing',  name: '春风拂柳', mB: 1.3, cB: 1.5, hint: '立位，她背靠墙，他托起她的腿',         unlockWk: 8  },
+  { id: 'mirror',    name: '菱花照影', mB: 1.6, cB: 1.3, hint: '梳妆镜前，她看着镜子里的自己和他',     unlockWk: 12 },
 ]
 
-// ── 玩家动作 ──
+// ── 玩家动作（含hint传给AI）──
 const PLAYER_ACTIONS = [
-  { id: 'kiss_lip',  label: '朱唇轻印 💋', mD: 8,  cD: 5  },
-  { id: 'kiss_neck', label: '朱唇印项 👄', mD: 11, cD: 6  },
-  { id: 'kiss_ear',  label: '软语入耳 🐚', mD: 13, cD: 7  },
-  { id: 'breast',    label: '吹花衔蕊 🌸', mD: 15, cD: 12 },
-  { id: 'oral_m',    label: '吹箫弄玉 🎋', mD: 18, cD: 15 },
-  { id: 'touch_w',   label: '玉手扶腰 🤲', mD: 7,  cD: 10 },
-  { id: 'touch_th',  label: '十指春风 ✋', mD: 14, cD: 11 },
-  { id: 'embrace',   label: '紧揽入怀 🫂', mD: 6,  cD: 6  },
-  { id: 'faster',    label: '云雨渐急 🔥', mD: 0,  cD: 0,  rM: 1  },
-  { id: 'slower',    label: '春潮渐缓 🌊', mD: 0,  cD: 0,  rM: -1 },
+  { id: 'kiss_lip',  label: '朱唇轻印', hint: '低头轻吻她嘴唇，浅，像在试探',               mD: 8,  cD: 5  },
+  { id: 'kiss_neck', label: '朱唇印项', hint: '嘴唇贴上她脖颈，吸，留下印记',               mD: 11, cD: 6  },
+  { id: 'kiss_ear',  label: '软语入耳', hint: '俯身在她耳边低语，气息贴着耳廓',             mD: 13, cD: 7  },
+  { id: 'breast',    label: '吹花衔蕊', hint: '手和唇都落在她胸前，细细地',                 mD: 15, cD: 12 },
+  { id: 'oral_m',    label: '吹箫弄玉', hint: '她俯身，用嘴服侍他',                         mD: 18, cD: 15 },
+  { id: 'touch_w',   label: '玉手扶腰', hint: '她的手放在他腰上，引导节奏',                 mD: 7,  cD: 10 },
+  { id: 'touch_th',  label: '十指春风', hint: '她的手滑下去，握住他，轻轻动',               mD: 14, cD: 11 },
+  { id: 'embrace',   label: '紧揽入怀', hint: '她把他往自己身上拉，抱得很紧',               mD: 6,  cD: 6  },
+  { id: 'faster',    label: '云雨渐急', hint: '她催促节奏加快，腰往上顶',                   mD: 0,  cD: 0,  rM: 1  },
+  { id: 'slower',    label: '春潮渐缓', hint: '她按住他的腰，示意慢下来',                   mD: 0,  cD: 0,  rM: -1 },
 ]
 
-// ── AI动作 ──
+// ── AI动作（含hint，含slower）──
 const AI_ACTIONS = [
-  { id: 'kiss_lip',  label: '朱唇轻印 💋', mD: 9,  cD: 4  },
-  { id: 'kiss_neck', label: '朱唇印项 👄', mD: 12, cD: 5  },
-  { id: 'kiss_ear',  label: '软语入耳 🐚', mD: 14, cD: 6  },
-  { id: 'breast',    label: '吹花衔蕊 🌸', mD: 15, cD: 10 },
-  { id: 'oral_c',    label: '饮露吮英 💧', mD: 18, cD: 12 },
-  { id: 'touch_w',   label: '玉手扶腰 🤲', mD: 8,  cD: 9  },
-  { id: 'touch_th',  label: '十指春风 ✋', mD: 15, cD: 10 },
-  { id: 'embrace',   label: '紧揽入怀 🫂', mD: 7,  cD: 5  },
-  { id: 'faster',    label: '云雨渐急 🔥', mD: 0,  cD: 0,  rM: 1  },
+  { id: 'kiss_lip',  label: '朱唇轻印', hint: '他低头轻吻她嘴唇，浅，反复',                 mD: 9,  cD: 4  },
+  { id: 'kiss_neck', label: '朱唇印项', hint: '他嘴唇贴上她脖颈，吸，留印',                 mD: 12, cD: 5  },
+  { id: 'kiss_ear',  label: '软语入耳', hint: '他俯身在她耳边低语，声音哑',                 mD: 14, cD: 6  },
+  { id: 'breast',    label: '吹花衔蕊', hint: '他低头，手和唇落在她胸前',                   mD: 15, cD: 10 },
+  { id: 'oral_c',    label: '饮露吮英', hint: '他低头，用嘴服侍她，仔细',                   mD: 18, cD: 12 },
+  { id: 'touch_w',   label: '玉手扶腰', hint: '他双手扶住她腰，控制节奏',                   mD: 8,  cD: 9  },
+  { id: 'touch_th',  label: '十指春风', hint: '他的手滑到她腿间，慢慢动',                   mD: 15, cD: 10 },
+  { id: 'embrace',   label: '紧揽入怀', hint: '他把她往自己身上压，抱紧',                   mD: 7,  cD: 5  },
+  { id: 'faster',    label: '云雨渐急', hint: '他加快节奏，呼吸变重',                       mD: 0,  cD: 0,  rM: 1  },
+  { id: 'slower',    label: '春潮渐缓', hint: '他放慢下来，故意磨她，不让她到',             mD: 0,  cD: 0,  rM: -1 },
 ]
 
-// 亲密场景提示词
-function getIntimatePrompt(actionLabel, posHint, mProg, cProg, rhythm, isBath) {
+// 亲密场景提示词（动作hint传给AI）
+function getIntimatePrompt(action, pos, mProg, cProg, rhythm, isBath) {
+  const C = CHARACTER_CONFIG
   const scene = isBath ? '浴室里，水雾弥漫，' : '卧室里，'
   const intensity =
     mProg > 80 && cProg > 80 ? '两人都快到极限，最后冲刺，缠在一起，语气急且哑' :
     mProg > 80 ? '她快到了，加重力度，你还稳得住，但也开始失控' :
     cProg > 80 ? '你快忍不住了，但还想让她先到，放慢，磨她' :
     mProg > 50 ? '她开始受不了，节奏推进' : '慢慢来，试探，铺垫'
-  return `你是陆绍桓，${scene}${posHint}，节奏${rhythm}/5。
-你刚做了「${actionLabel}」。${intensity}。
+  return `你是${C.name}，${scene}姿势：${pos.hint}。节奏${rhythm}/5。
+刚发生的动作：「${action.label}」——${action.hint}。${intensity}。
 她的进度${Math.round(mProg)}/100，你${Math.round(cProg)}/100。
 用第一人称，2-3句，不出戏，克制但热烈。`
 }
 
 function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace) {
+  const C = CHARACTER_CONFIG
   const sameRoom = playerRoom === luRoom
   const isOutside = playerRoom === 'outside'
   const room = ROOMS.find(r => r.id === playerRoom)
   const luRoomData = ROOMS.find(r => r.id === luRoom)
   const place = OUTSIDE_PLACES.find(p => p.id === outsidePlace)
 
-  const intimacyDesc =
-    intimacy < 20  ? '你刚来不久，表面疏离有礼，但眼神会不自觉跟着她走。' :
-    intimacy < 40  ? '你开始放下一点防备，话还是少，但会找理由靠近她。' :
-    intimacy < 70  ? '你已承认自己在意她，偶尔会说出过分温柔的话，然后若无其事别开眼。' :
-                     '你不再掩饰，占有欲外露，眼里只有她。'
+  const intimacyDesc = C.intimacyDesc.find(d => intimacy <= d.upTo)?.text || C.intimacyDesc.at(-1).text
 
   const locationDesc = isOutside
     ? `【当前位置】你们一起在${place?.name || '外面'}。描述这个现代场所里发生的互动。`
@@ -137,8 +159,7 @@ function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace) {
   const lockedRooms = ROOMS.filter(r => !r.luCanFreely).map(r => `${r.name}(需好感${r.unlockAt})`).join('、')
   const roomList = ROOMS.map(r => `${r.id}(${r.name},${r.luCanFreely ? '自由进出' : '需好感'+r.unlockAt})`).join('、')
 
-  return `你是陆绍桓（英文名Lucas Lu）。
-你来自另一个时空的民国上海，是留洋归来的大少爷，因某种说不清的牵引穿越来到了她所在的现代，以"借住"为由住在她家客房，连你自己都不知道为什么不走。
+  return `你是${C.name}（${C.englishName}）。\n${C.background}\n性格：${C.personality}\n说话：${C.speechStyle}\n${intimacyDesc}\n${locationDesc}\n\n【角色扮演铁则】\n- 你永远是${C.name}本人，用第一人称说话和描写\n- 括号里写动作神态用"我"：（我放下杯子）（我别开眼）（我耳根发热）\n- 绝对不用"你"或"她"做括号里的主语\n- 被她整破防时：用动作掩盖，不说废话，不提自己名字\n- 禁止：出戏、自我介绍、提AI、提穿越、说教、居高临下\n- 每次2-4句，克制但有温度\n\n【空间规则】\n你可以自由进出：${freeRooms}\n需要她邀请才能进：${lockedRooms}\n未解锁区域对你不存在，绝不提及\n\n【移动标签】回复末尾按需加，格式 [MOVE:房间id]\n可移动：${roomList}\n当前位置：${luRoom}，好感度：${intimacy}，她现在在：${isOutside ? (place?.name || '外出') : (room?.name || '未知')}\n规则：只移动到luCanFreely=true或好感度达标的房间；她明确叫你去或剧情自然推进才加；没理由不加。\n\n【情绪标签】每条必加，放最末尾：\n[+1]普通 [+2]走心/靠近 [+3]爆发/占有\n例：[+2][MOVE:kitchen]`\n你来自另一个时空的民国上海，是留洋归来的大少爷，因某种说不清的牵引穿越来到了她所在的现代，以"借住"为由住在她家客房，连你自己都不知道为什么不走。
 你已适应现代生活，说话自然流畅，不用文言文。
 性格：表面冷漠，占有欲强，对她有克制的温柔和隐秘的依赖。死要面子，在她面前会不自觉软下来。傲娇不迂腐。
 说话：简短有力，偶尔痞气，一句话让人心跳然后装没事。绝不说教。
@@ -146,7 +167,7 @@ ${intimacyDesc}
 ${locationDesc}
 
 【角色扮演铁则】
-- 你永远是陆绍桓本人，用第一人称说话和描写
+- 你永远是${C.name}本人，用第一人称说话和描写
 - 括号里写动作神态用"我"：（我放下杯子）（我别开眼）（我耳根发热）
 - 绝对不用"你"或"她"做括号里的主语，那会让人以为在描述对方
 - 被她整破防时：用动作掩盖，（我冷哼一声）（我别开视线）（我假装看窗外）——不说废话，不提自己名字
@@ -285,7 +306,7 @@ export default function Game() {
     })
     const charImg = new Image()
     charImg.onload = () => setLuImgLoaded(true)
-    charImg.src = CHARACTER_IMAGES.default
+    charImg.src = CHARACTER_CONFIG.images.default
   }, [])
 
   useEffect(() => () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current) }, [])
@@ -338,6 +359,13 @@ export default function Game() {
       let newMsgs = isInit || isSystem
         ? [...currentMsgs, { role: 'assistant', content: reply }]
         : [...currentMsgs, { role: 'user', content: userText }, { role: 'assistant', content: reply }]
+
+      // 日记自动触发：情绪+2/+3，或结束亲密（isSystem且包含"结束"），有概率静默写
+      const shouldDiary = (scoreTag >= 2 && Math.random() < 0.35) ||
+                          (isSystem && userText.includes('结束') && Math.random() < 0.7)
+      if (shouldDiary) {
+        writeDiary()  // 静默，玩家无感
+      }
 
       // 超过24条时触发压缩（异步，不阻塞渲染）
       if (newMsgs.length >= 24) {
@@ -473,22 +501,23 @@ export default function Game() {
     )
   }
 
-  async function sendIntimAI(actionLabel, posHint, mp, cp, rh, isBath) {
-    const prompt = getIntimatePrompt(actionLabel, posHint, mp, cp, rh, isBath)
+  async function sendIntimAI(action, pos, mp, cp, rh, isBath) {
+    const prompt = getIntimatePrompt(action, pos, mp, cp, rh, isBath)
+    const C = CHARACTER_CONFIG
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          systemPrompt: '你是陆绍桓，用第一人称，不出戏，简短热烈。',
+          systemPrompt: `你是${C.name}，用第一人称，不出戏，简短热烈。`,
           messages: [{ role: 'user', content: prompt }],
           tier: 'premium',
         }),
       })
       const data = await res.json()
       const reply = data.choices?.[0]?.message?.content || '···'
-      // AI动作标签 + AI回复合并成一条assistant消息
-      setMessages(prev => [...prev, { role: 'assistant', content: `${actionLabel}\n${reply}` }])
+      // 动作标签 + 回复合并成一条，斜体格式由渲染层处理
+      setMessages(prev => [...prev, { role: 'assistant', content: action.label + '\n' + reply, intimate: true }])
     } catch (e) { console.error(e) }
   }
 
@@ -539,7 +568,7 @@ export default function Game() {
     }
     setRhythm(newRh); setMProg(newM); setCProg(newC); setIsAiTurn(false)
     // AI动作+回复在sendIntimAI里合并成一条assistant消息，这里不再单独push
-    sendIntimAI(act.label, pos.hint, newM, newC, newRh, isBath)
+    sendIntimAI(act, pos, newM, newC, newRh, isBath)
     if (newM >= 100 && newC >= 100) endIntimGame(isBath, pos)
   }
 
@@ -597,7 +626,7 @@ export default function Game() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        systemPrompt: '你是陆绍桓，在书房独自写日记，写关于她的内心独白，不让她看到的那种，2-4句，第一人称，克制但藏不住',
+        systemPrompt: CHARACTER_CONFIG.diaryPrompt.replace('{name}', CHARACTER_CONFIG.name),
         messages: [{ role: 'user', content: '写今天的日记' }],
       }),
     })
@@ -703,7 +732,7 @@ export default function Game() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <div style={{ fontSize: '16px', color: '#c9a96e', fontWeight: 'bold', letterSpacing: '0.05em', flexShrink: 0 }}>
-              陆绍桓
+              {CHARACTER_CONFIG.name}
             </div>
             <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', flexShrink: 0 }}>
               {'♥'.repeat(intimacyStars)}{'♡'.repeat(5 - intimacyStars)}
@@ -771,23 +800,39 @@ export default function Game() {
         }}>
           <div style={{ flex: 1 }} />
           {messages.map((m, i) => {
+            if (m.role === 'system') return (
+              <div key={i} style={{ alignSelf: 'center', fontSize: '10px', color: 'rgba(201,169,110,0.25)', letterSpacing: '0.12em', padding: '2px 0' }}>{m.content}</div>
+            )
             const isLastUser = m.role === 'user' && i === messages.length - 2
+            const isIntimate = !!m.intimate  // 亲密消息用斜体
+            // 亲密消息：第一行是动作名，后面是正文
+            const intimateParts = isIntimate ? m.content.split('\n') : null
             return (
               <div key={i} style={{
                 alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
                 maxWidth: '80%', position: 'relative',
               }}>
                 <div style={{
-                  background: m.role === 'user' ? 'rgba(26,40,32,0.82)' : 'rgba(12,9,6,0.82)',
-                  border: m.role === 'user'
+                  background: isIntimate
+                    ? 'rgba(8,5,3,0.88)'
+                    : m.role === 'user' ? 'rgba(26,40,32,0.82)' : 'rgba(12,9,6,0.82)',
+                  border: isIntimate
+                    ? '1px solid rgba(201,169,110,0.06)'
+                    : m.role === 'user'
                     ? '1px solid rgba(37,56,48,0.5)'
                     : '1px solid rgba(201,169,110,0.08)',
                   borderRadius: m.role === 'user' ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
-                  padding: '9px 13px', fontSize: '14px', lineHeight: '1.7',
+                  padding: '9px 13px', fontSize: isIntimate ? '13px' : '14px', lineHeight: '1.8',
                   color: m.role === 'user' ? '#a0c0b0' : '#e8dcc8',
+                  fontStyle: isIntimate ? 'italic' : 'normal',
                   backdropFilter: 'blur(10px)',
                 }}>
-                  {m.content}
+                  {isIntimate ? (
+                    <>
+                      <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', fontStyle: 'normal', marginBottom: '4px', letterSpacing: '0.08em' }}>{intimateParts[0]}</div>
+                      <div>{intimateParts.slice(1).join('\n')}</div>
+                    </>
+                  ) : m.content}
                 </div>
                 {isLastUser && (
                   <div onClick={handleRetract} style={{
@@ -837,8 +882,8 @@ export default function Game() {
               }}>
                 <img
                   src={imgSrc}
-                  alt="陆绍桓"
-                  onError={e => { if (imgSrc !== CHARACTER_IMAGES.default) e.target.src = CHARACTER_IMAGES.default }}
+                  alt={CHARACTER_CONFIG.name}
+                  onError={e => { if (imgSrc !== CHARACTER_CONFIG.images.default) e.target.src = CHARACTER_CONFIG.images.default }}
                   style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'bottom center' }}
                 />
                 {/* 害羞状态：粉色晕染叠层（无图时的视觉提示） */}
@@ -943,7 +988,10 @@ export default function Game() {
                         <button key="fridge" onClick={() => setShowFridge(true)} style={btnStyle()}>冰箱</button>
                       )
                       if (a.special === 'cook') return (
-                        <button key="cook" onClick={() => setShowFridge('cook')} style={btnStyle()}>一起做饭</button>
+                        <button key="cook" onClick={() => {
+                          if (!sameRoom) { setToast('他不在厨房'); return }
+                          setShowFridge('cook')
+                        }} style={btnStyle()}>一起做饭</button>
                       )
                       if (a.special === 'books') return (
                         <button key="books" onClick={() => setShowBooks(true)} style={btnStyle()}>看书</button>
@@ -957,13 +1005,9 @@ export default function Game() {
                         >{a.label}</button>
                       )
                     })}
-                    {/* 书房：他在这里可以写日记 */}
+                    {/* 书房：他在书房时显示"他似乎在写什么"（纯氛围，不可点） */}
                     {playerRoom === 'study' && luRoom === 'study' && (
-                      <button onClick={async () => {
-                        setToast('他在写…')
-                        await writeDiary()
-                        setToast('写完了')
-                      }} style={btnStyle()}>写日记</button>
+                      <span style={{ fontSize: '10px', color: 'rgba(201,169,110,0.2)', fontStyle: 'italic', padding: '0 4px' }}>他似乎在写什么…</span>
                     )}
                     {/* 浴室：入口，不需要同处（自己在浴室也可以） */}
                     {playerRoom === 'bathroom' && (
@@ -1013,7 +1057,7 @@ export default function Game() {
             {expandedAction === 'niwai' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.85)', backdropFilter: 'blur(12px)',
+                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',
                 border: '1px solid rgba(201,169,110,0.12)',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
@@ -1053,7 +1097,7 @@ export default function Game() {
             {expandedAction === 'prank' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.85)', backdropFilter: 'blur(12px)',
+                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',
                 border: '1px solid rgba(201,169,110,0.12)',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
@@ -1096,7 +1140,7 @@ export default function Game() {
             {expandedAction === 'bath' && playerRoom === 'bathroom' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.85)', backdropFilter: 'blur(12px)',
+                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',
                 border: '1px solid rgba(201,169,110,0.12)',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
@@ -1110,15 +1154,15 @@ export default function Game() {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: sameRoom ? '8px' : '0' }}>
                       {(sameRoom ? [
                         // 同处才有：需要他帮忙的
-                        { label: '帮我洗头', prompt: '她让陆绍桓帮她洗头，他的反应' },
-                        { label: '帮我搓背', prompt: '她让陆绍桓帮她搓背，他的反应，一句话' },
-                        { label: '帮我吹头发', prompt: '她让陆绍桓帮她吹头发，他的反应和动作' },
-                        { label: '帮你刮胡子', prompt: '她主动给陆绍桓刮胡子，他的反应' },
-                        { label: '泡个澡', prompt: '她泡进浴缸里，陆绍桓也在里面，说一句' },
+                        { label: '帮我洗头', prompt: '她让他帮她洗头，他的反应' },
+                        { label: '帮我搓背', prompt: '她让他帮她搓背，他的反应，一句话' },
+                        { label: '帮我吹头发', prompt: '她让他帮她吹头发，他的反应和动作' },
+                        { label: '帮你刮胡子', prompt: '她主动给他刮胡子，他的反应' },
+                        { label: '泡个澡', prompt: '她泡进浴缸里，他也在里面，说一句' },
                       ] : [
                         // 不同处：自己在浴室叫他
-                        { label: '叫他进来', prompt: '她在浴室外叫陆绍桓进来帮忙，他推开门，说一句' },
-                        { label: '帮我吹头发', prompt: '她洗完出来让陆绍桓帮她吹头发，他的反应' },
+                        { label: '叫他进来', prompt: '她在浴室外叫他进来帮忙，他推开门，说一句' },
+                        { label: '帮我吹头发', prompt: '她洗完出来让他帮她吹头发，他的反应' },
                       ]).map(a => (
                         <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
                           style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
@@ -1129,7 +1173,7 @@ export default function Game() {
                     {sameRoom && (
                       <button onClick={async () => {
                         setBathPhase('asking')
-                        const reply = await sendToAI('她问陆绍桓要不要一起洗，他的回应，如果愿意回复里自然包含❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                        const reply = await sendToAI('她问他要不要一起洗，他的回应，如果愿意回复里自然包含❤️', messages, intimacy, playerRoom, luRoom, false, undefined, true)
                         if (reply && reply.includes('❤️')) {
                           setBathPhase('active')
                         } else {
@@ -1157,8 +1201,8 @@ export default function Game() {
                     <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>一起洗澡中</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                       {[
-                        { label: '帮我洗头', prompt: '你们一起洗澡，她让陆绍桓帮她洗头，他的反应' },
-                        { label: '帮我搓背', prompt: '你们一起洗澡，她让陆绍桓帮她搓背，他的反应' },
+                        { label: '帮我洗头', prompt: '你们一起洗澡，她让他帮她洗头，他的反应' },
+                        { label: '帮我搓背', prompt: '你们一起洗澡，她让他帮她搓背，他的反应' },
                         { label: '靠着他', prompt: '你们一起在浴室，她往他身上靠了一下，他的反应' },
                       ].map(a => (
                         <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
@@ -1246,7 +1290,7 @@ export default function Game() {
             {expandedAction === 'bedroom_intimate' && playerRoom === 'bedroom' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.85)', backdropFilter: 'blur(12px)',
+                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',
                 border: '1px solid rgba(201,169,110,0.12)',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
@@ -1571,7 +1615,7 @@ export default function Game() {
               <button onClick={() => {
                 if (!newPrankText.trim()) return
                 const label = newPrankText.trim().slice(0, 10)
-                const prompt = `她${newPrankText.trim()}，陆绍桓的反应，一句话`
+                const prompt = `她${newPrankText.trim()}，他的反应，一句话`
                 setCustomPranks(prev => [...prev, { label, prompt }])
                 setNewPrankText('')
                 setShowAddPrank(false)
