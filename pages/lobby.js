@@ -175,15 +175,15 @@ export default function Lobby() {
             </div>
 
             {/* 卡牌区 */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden', paddingTop: '0', marginTop: '-30px' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'visible' }}>
               <div style={{
-                position: 'absolute', left: 0, top: 0, bottom: 0, width: '70px', zIndex: 5,
-                background: 'linear-gradient(to right, rgba(2,1,12,0.95), transparent)',
+                position: 'absolute', left: 0, top: 0, bottom: 0, width: '40px', zIndex: 5,
+                background: 'linear-gradient(to right, rgba(5,3,20,0.85), transparent)',
                 pointerEvents: 'none',
               }} />
               <div style={{
-                position: 'absolute', right: 0, top: 0, bottom: 0, width: '70px', zIndex: 5,
-                background: 'linear-gradient(to left, rgba(2,1,12,0.95), transparent)',
+                position: 'absolute', right: 0, top: 0, bottom: 0, width: '40px', zIndex: 5,
+                background: 'linear-gradient(to left, rgba(5,3,20,0.85), transparent)',
                 pointerEvents: 'none',
               }} />
 
@@ -192,7 +192,7 @@ export default function Lobby() {
                 className="card-track"
                 style={{
                   display: 'flex', alignItems: 'center', gap: '14px',
-                  padding: '10px 95px 20px', overflowX: 'auto',
+                  padding: '20px 120px', overflowX: 'auto',
                   scrollSnapType: 'x mandatory', width: '100%',
                 }}
               >
