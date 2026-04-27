@@ -159,7 +159,7 @@ export default function Lobby() {
             display: 'flex', flexDirection: 'column',
           }}>
             {/* 顶部标题 */}
-            <div style={{ textAlign: 'center', padding: '44px 20px 16px', flexShrink: 0 }}>
+            <div style={{ textAlign: 'center', padding: '32px 20px 8px', flexShrink: 0 }}>
               <div className="subtitle-breathe" style={{
                 fontSize: '10px', color: 'rgba(180,220,255,0.7)',
                 letterSpacing: '0.45em', marginBottom: '12px',
@@ -192,7 +192,7 @@ export default function Lobby() {
                 className="card-track"
                 style={{
                   display: 'flex', alignItems: 'center', gap: '14px',
-                  padding: '30px 95px', overflowX: 'auto',
+                  padding: '10px 95px 20px', overflowX: 'auto',
                   scrollSnapType: 'x mandatory', width: '100%',
                 }}
               >
@@ -219,11 +219,15 @@ export default function Lobby() {
                       ? `0 0 40px ${glowColor}, 0 0 80px rgba(60,120,255,0.08), 0 20px 50px rgba(0,0,0,0.7)`
                       : 'none',
                     ...(isCustom ? {
-                      background: 'transparent',
-                      border: isActive ? '1px dashed rgba(160,210,255,0.4)' : '1px dashed rgba(140,200,255,0.1)',
+                      background: isActive ? 'rgba(20,35,65,0.45)' : 'rgba(10,18,40,0.3)',
+                      backdropFilter: 'blur(18px)',
+                      WebkitBackdropFilter: 'blur(18px)',
+                      border: isActive ? '1px solid rgba(160,210,255,0.35)' : '1px dashed rgba(140,200,255,0.1)',
                     } : isPlaceholder ? {
-                      background: 'linear-gradient(160deg, #080c18 0%, #040608 100%)',
-                      border: isActive ? '1px solid rgba(100,150,255,0.25)' : '1px solid rgba(80,120,255,0.06)',
+                      background: isActive ? 'rgba(20,30,60,0.45)' : 'rgba(10,15,35,0.3)',
+                      backdropFilter: 'blur(18px)',
+                      WebkitBackdropFilter: 'blur(18px)',
+                      border: isActive ? '1px solid rgba(140,190,255,0.3)' : '1px solid rgba(100,150,255,0.08)',
                     } : {
                       background: theme?.cardBg || '#080c18',
                       border: isActive

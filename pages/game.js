@@ -90,38 +90,38 @@ const BEDROOM_POSITIONS = [
   { id: 'face',      name: '鸳鸯交颈', mB: 1.0, cB: 1.0, hint: '正面相对，能看清彼此的眼睛',           unlockWk: 0  },
   { id: 'cowgirl',   name: '观音坐莲', mB: 1.4, cB: 0.9, hint: '她在上，主动掌控节奏，他看着她',       unlockWk: 0  },
   { id: 'doggy',     name: '巫山云雨', mB: 1.2, cB: 1.3, hint: '她伏下，他从后，手扶着她的腰',         unlockWk: 0  },
-  { id: 'spoon',     name: '卧鸳同梦', mB: 0.9, cB: 0.9, hint: '侧躺，他从背后抱着她，节奏很慢很深',   unlockWk: 0  },
+  { id: 'spoon',     name: '卧鸳同梦', mB: 0.9, cB: 0.9, hint: '侧躺，他从背后抱着你，节奏很慢很深',   unlockWk: 0  },
   { id: 'trembling', name: '酥骨销魂', mB: 1.5, cB: 1.4, hint: '正面，他压着她，强度很高，她腿在抖',   unlockWk: 5  },
-  { id: 'standing',  name: '春风拂柳', mB: 1.3, cB: 1.5, hint: '立位，她背靠墙，他托起她的腿',         unlockWk: 8  },
+  { id: 'standing',  name: '春风拂柳', mB: 1.3, cB: 1.5, hint: '立位，她背靠墙，他托起你她的腿',         unlockWk: 8  },
   { id: 'mirror',    name: '菱花照影', mB: 1.6, cB: 1.3, hint: '梳妆镜前，她看着镜子里的自己和他',     unlockWk: 12 },
 ]
 
 // ── 玩家动作（含hint传给AI）──
 const PLAYER_ACTIONS = [
-  { id: 'kiss_lip',  label: '朱唇轻印', hint: '低头轻吻他嘴唇，浅，像在试探',               mD: 8,  cD: 5  },
-  { id: 'kiss_neck', label: '朱唇印项', hint: '嘴唇贴上他脖颈，吸，留下印记',               mD: 11, cD: 6  },
-  { id: 'kiss_ear',  label: '软语入耳', hint: '俯身在他耳边低语，气息贴着耳廓',             mD: 13, cD: 7  },
-  { id: 'breast',    label: '吹花衔蕊', hint: '手和唇都落在他胸前，细细地',                 mD: 15, cD: 12 },
-  { id: 'oral_m',    label: '吹箫弄玉', hint: '她俯身，用嘴服侍他',                         mD: 18, cD: 15 },
-  { id: 'touch_w',   label: '玉手扶腰', hint: '她的手放在他腰上，引导节奏',                 mD: 7,  cD: 10 },
-  { id: 'touch_th',  label: '十指春风', hint: '她的手滑下去，握住他，轻轻动',               mD: 14, cD: 11 },
-  { id: 'embrace',   label: '紧揽入怀', hint: '她把他往自己身上拉，抱得很紧',               mD: 6,  cD: 6  },
-  { id: 'faster',    label: '云雨渐急', hint: '她催促他节奏加快，腰往上顶',                   mD: 0,  cD: 0,  rM: 1  },
-  { id: 'slower',    label: '春潮渐缓', hint: '她按住他的腰，示意慢下来',                   mD: 0,  cD: 0,  rM: -1 },
+  { id: 'kiss_lip',  label: '朱唇轻印', hint: '她低头轻吻你嘴唇，浅，像在试探',               mD: 8,  cD: 5  },
+  { id: 'kiss_neck', label: '朱唇印项', hint: '嘴唇贴上你脖颈，吸，留下印记',               mD: 11, cD: 6  },
+  { id: 'kiss_ear',  label: '软语入耳', hint: '俯身在你耳边低语，气息贴着耳廓',             mD: 13, cD: 7  },
+  { id: 'breast',    label: '吹花衔蕊', hint: '手和唇都落在你胸前，细细地',                 mD: 15, cD: 12 },
+  { id: 'oral_m',    label: '吹箫弄玉', hint: '她俯身，用嘴服侍你',                         mD: 18, cD: 15 },
+  { id: 'touch_w',   label: '玉手扶腰', hint: '她的手放在你腰上，引导节奏',                 mD: 7,  cD: 10 },
+  { id: 'touch_th',  label: '十指春风', hint: '她的手滑下去，握住你，轻轻动',               mD: 14, cD: 11 },
+  { id: 'embrace',   label: '紧揽入怀', hint: '她把你往自己身上拉，抱得很紧',               mD: 6,  cD: 6  },
+  { id: 'faster',    label: '云雨渐急', hint: '她催促你节奏加快，腰往上顶',                   mD: 0,  cD: 0,  rM: 1  },
+  { id: 'slower',    label: '春潮渐缓', hint: '她按住你的腰，示意慢下来',                   mD: 0,  cD: 0,  rM: -1 },
 ]
 
 // ── AI动作（含hint，含slower）──
 const AI_ACTIONS = [
-  { id: 'kiss_lip',  label: '朱唇轻印', hint: '他低头轻吻她嘴唇，浅，反复',                 mD: 9,  cD: 4  },
-  { id: 'kiss_neck', label: '朱唇印项', hint: '他嘴唇贴上她脖颈，吸，留印',                 mD: 12, cD: 5  },
-  { id: 'kiss_ear',  label: '软语入耳', hint: '他俯身在她耳边低语，声音哑',                 mD: 14, cD: 6  },
-  { id: 'breast',    label: '吹花衔蕊', hint: '他低头，手和唇落在她胸前',                   mD: 15, cD: 10 },
-  { id: 'oral_c',    label: '饮露吮英', hint: '他低头，用嘴服侍她，仔细',                   mD: 18, cD: 12 },
-  { id: 'touch_w',   label: '玉手扶腰', hint: '他双手扶住她腰，控制节奏',                   mD: 8,  cD: 9  },
-  { id: 'touch_th',  label: '十指春风', hint: '他的手滑到她腿间，慢慢动',                   mD: 15, cD: 10 },
-  { id: 'embrace',   label: '紧揽入怀', hint: '他把她往自己身上压，抱紧',                   mD: 7,  cD: 5  },
-  { id: 'faster',    label: '云雨渐急', hint: '他加快节奏，呼吸变重',                       mD: 0,  cD: 0,  rM: 1  },
-  { id: 'slower',    label: '春潮渐缓', hint: '他放慢下来，故意磨她，不让她到',             mD: 0,  cD: 0,  rM: -1 },
+  { id: 'kiss_lip',  label: '朱唇轻印', hint: '你低头轻吻她嘴唇，浅，反复',                 mD: 9,  cD: 4  },
+  { id: 'kiss_neck', label: '朱唇印项', hint: '你嘴唇贴上她脖颈，吸，留印',                 mD: 12, cD: 5  },
+  { id: 'kiss_ear',  label: '软语入耳', hint: '你俯身在她耳边低语，声音哑',                 mD: 14, cD: 6  },
+  { id: 'breast',    label: '吹花衔蕊', hint: '你低头，手和唇落在她胸前',                   mD: 15, cD: 10 },
+  { id: 'oral_c',    label: '饮露吮英', hint: '你低头，用嘴服侍她，仔细',                   mD: 18, cD: 12 },
+  { id: 'touch_w',   label: '玉手扶腰', hint: '你双手扶住她腰，控制节奏',                   mD: 8,  cD: 9  },
+  { id: 'touch_th',  label: '十指春风', hint: '你的手滑到她腿间，慢慢动',                   mD: 15, cD: 10 },
+  { id: 'embrace',   label: '紧揽入怀', hint: '你把她往自己身上压，抱紧',                   mD: 7,  cD: 5  },
+  { id: 'faster',    label: '云雨渐急', hint: '你加快节奏，呼吸变重',                       mD: 0,  cD: 0,  rM: 1  },
+  { id: 'slower',    label: '春潮渐缓', hint: '你放慢下来，故意磨她，不让她到',             mD: 0,  cD: 0,  rM: -1 },
 ]
 
 // 亲密场景提示词（动作hint传给AI）
