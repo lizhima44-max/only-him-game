@@ -13,7 +13,6 @@ const CHARACTERS = [
     cardImg: null,
     isPlaceholder: true,
     theme: null,
-    // placeholder 也给一个视觉 glow 色，激活时荧光
     glowColor: 'rgba(80,130,255,0.3)',
   },
   {
@@ -108,27 +107,11 @@ export default function Lobby() {
         html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; background: #020108; }
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 
-        @keyframes titleBreathe {
-          0%, 100% {
-            text-shadow: 0 0 20px rgba(80,160,255,0.5), 0 0 40px rgba(80,160,255,0.25), 0 0 80px rgba(60,120,255,0.1);
-          }
-          50% {
-            text-shadow: 0 0 32px rgba(100,180,255,0.95), 0 0 65px rgba(80,160,255,0.5), 0 0 110px rgba(60,140,255,0.22);
-          }
-        }
-        .title-breathe { animation: titleBreathe 3.5s ease-in-out infinite; }
-
-        @keyframes subtitleBreathe {
-          0%, 100% { opacity: 0.45; }
+        @keyframes shimmer {
+          0%, 100% { opacity: 0.55; }
           50% { opacity: 0.95; }
         }
-        .subtitle-breathe { animation: subtitleBreathe 4s ease-in-out infinite; }
-
-        @keyframes hintBreathe {
-          0%, 100% { opacity: 0.35; }
-          50% { opacity: 0.8; }
-        }
-        .hint-breathe { animation: hintBreathe 3s ease-in-out infinite; }
+        .shimmer { animation: shimmer 4s ease-in-out infinite; }
 
         .card-track { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
         .card-track::-webkit-scrollbar { display: none; }
@@ -158,34 +141,27 @@ export default function Lobby() {
             position: 'relative', zIndex: 10, height: '100%',
             display: 'flex', flexDirection: 'column',
           }}>
-            {/* 顶部标题 */}
+            {/* 顶部标题 - 去掉呼吸效果 */}
             <div style={{ textAlign: 'center', padding: '32px 20px 8px', flexShrink: 0 }}>
-              <div className="subtitle-breathe" style={{
-                fontSize: '10px', color: 'rgba(180,220,255,0.7)',
+              <div style={{
+                fontSize: '12px', color: 'rgba(220,235,255,0.75)',
                 letterSpacing: '0.45em', marginBottom: '12px',
+                textShadow: '0 0 16px rgba(80,160,255,0.35)',
               }}>ONLY HIM</div>
-              <div className="title-breathe" style={{
-                fontSize: '32px', color: 'rgba(220,235,255,0.98)',
+              <div style={{
+                fontSize: '32px', color: 'rgba(230,240,255,0.98)',
                 fontStyle: 'italic', letterSpacing: '0.08em',
+                textShadow: '0 0 24px rgba(80,160,255,0.5), 0 0 48px rgba(80,160,255,0.2)',
               }}>是他</div>
-              <div className="subtitle-breathe" style={{
-                fontSize: '10px', color: 'rgba(160,210,255,0.6)',
-                letterSpacing: '0.2em', marginTop: '10px', animationDelay: '0.5s',
+              <div style={{
+                fontSize: '11px', color: 'rgba(200,225,255,0.65)',
+                letterSpacing: '0.2em', marginTop: '10px',
+                textShadow: '0 0 12px rgba(80,160,255,0.3)',
               }}>选择你的故事</div>
             </div>
 
-            {/* 卡牌区 */}
+            {/* 卡牌区 - 去掉两边黑色渐变 */}
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'visible' }}>
-              <div style={{
-                position: 'absolute', left: 0, top: 0, bottom: 0, width: '40px', zIndex: 5,
-                background: 'linear-gradient(to right, rgba(5,3,20,0.85), transparent)',
-                pointerEvents: 'none',
-              }} />
-              <div style={{
-                position: 'absolute', right: 0, top: 0, bottom: 0, width: '40px', zIndex: 5,
-                background: 'linear-gradient(to left, rgba(5,3,20,0.85), transparent)',
-                pointerEvents: 'none',
-              }} />
 
               <div
                 ref={trackRef}
@@ -201,7 +177,6 @@ export default function Lobby() {
                   const isCustom = char.isCustom
                   const isPlaceholder = char.isPlaceholder
                   const theme = char.theme
-                  // 所有卡激活时都要荧光
                   const glowColor = theme?.glow || char.glowColor || 'rgba(80,130,255,0.2)'
 
                   const cardStyle = {
@@ -214,17 +189,16 @@ export default function Lobby() {
                     height: isActive ? '295px' : '215px',
                     opacity: isActive ? 1 : 0.38,
                     transform: isActive ? 'scale(1)' : 'scale(0.86)',
-                    // 所有卡激活时都有 boxShadow 荧光
                     boxShadow: isActive
                       ? `0 0 40px ${glowColor}, 0 0 80px rgba(60,120,255,0.08), 0 20px 50px rgba(0,0,0,0.7)`
                       : 'none',
                     ...(isCustom ? {
-                      background: isActive ? 'rgba(15,28,60,0.35)' : 'rgba(8,14,35,0.18)',
+                      background: isActive ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
                       backdropFilter: 'blur(18px)',
                       WebkitBackdropFilter: 'blur(18px)',
                       border: isActive ? '1px solid rgba(160,210,255,0.35)' : '1px dashed rgba(140,200,255,0.1)',
                     } : isPlaceholder ? {
-                      background: isActive ? 'rgba(15,25,55,0.35)' : 'rgba(8,12,28,0.18)',
+                      background: isActive ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
                       backdropFilter: 'blur(18px)',
                       WebkitBackdropFilter: 'blur(18px)',
                       border: isActive ? '1px solid rgba(140,190,255,0.3)' : '1px solid rgba(100,150,255,0.08)',
@@ -376,10 +350,10 @@ export default function Lobby() {
               ))}
             </div>
 
-            <div className="hint-breathe" style={{
+            <div className="shimmer" style={{
               textAlign: 'center', padding: '0 0 28px', flexShrink: 0,
-              fontSize: '10px', letterSpacing: '0.25em', color: 'rgba(160,210,255,0.7)',
-              textShadow: '0 0 10px rgba(80,160,255,0.4)',
+              fontSize: '11px', letterSpacing: '0.25em', color: 'rgba(200,225,255,0.7)',
+              textShadow: '0 0 10px rgba(80,160,255,0.35)',
             }}>← 横滑探索 · 点卡了解 →</div>
 
           </div>
@@ -439,7 +413,6 @@ export default function Lobby() {
                 style={{
                   flex: 1, display: 'flex', flexDirection: 'column',
                   background: 'linear-gradient(to bottom, rgba(4,7,20,1) 0%, #060c20 100%)',
-                  // 去掉大蓝边框，只留极细的线
                   borderTop: '1px solid rgba(80,160,255,0.08)',
                   overflow: 'hidden',
                 }}
@@ -470,7 +443,6 @@ export default function Lobby() {
                       <span key={tag} style={{
                         padding: '4px 10px', borderRadius: '20px',
                         border: `1px solid ${selectedChar.theme?.tagBorder || 'rgba(80,160,255,0.15)'}`,
-                        // 标签字小一点
                         fontSize: '9px',
                         color: selectedChar.theme?.tagColor || 'rgba(100,170,255,0.45)',
                         letterSpacing: '0.06em',

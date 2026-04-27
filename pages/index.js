@@ -89,26 +89,26 @@ export default function Home() {
         html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; background: #020108; }
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 
-        @keyframes titleBreathe {
-          0%, 100% {
-            text-shadow: 0 0 20px rgba(80,160,255,0.5), 0 0 40px rgba(80,160,255,0.25);
-          }
-          50% {
-            text-shadow: 0 0 32px rgba(100,180,255,0.95), 0 0 65px rgba(80,160,255,0.5), 0 0 110px rgba(60,140,255,0.22);
-          }
-        }
-        .title-breathe { animation: titleBreathe 3.5s ease-in-out infinite; }
-
-        @keyframes subtitleBreathe {
-          0%, 100% { opacity: 0.55; text-shadow: 0 0 8px rgba(80,160,255,0.3); }
-          50% { opacity: 1; text-shadow: 0 0 16px rgba(100,180,255,0.7), 0 0 32px rgba(80,160,255,0.3); }
-        }
-        .subtitle-breathe { animation: subtitleBreathe 4s ease-in-out infinite; }
-
-        input::placeholder { color: rgba(140,190,255,0.25); }
+        input::placeholder { color: rgba(180,210,255,0.35); }
         input:-webkit-autofill {
-          -webkit-box-shadow: 0 0 0 100px #020108 inset !important;
+          -webkit-box-shadow: 0 0 0 100px rgba(10,15,40,0.95) inset !important;
           -webkit-text-fill-color: rgba(200,225,255,0.9) !important;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeIn 0.8s ease-out both; }
+        .fade-in-d1 { animation: fadeIn 0.8s ease-out 0.1s both; }
+        .fade-in-d2 { animation: fadeIn 0.8s ease-out 0.2s both; }
+        .fade-in-d3 { animation: fadeIn 0.8s ease-out 0.3s both; }
+        .fade-in-d4 { animation: fadeIn 0.8s ease-out 0.4s both; }
+        .fade-in-d5 { animation: fadeIn 0.8s ease-out 0.5s both; }
+
+        @keyframes shimmer {
+          0%, 100% { opacity: 0.7; }
+          50% { opacity: 1; }
         }
       `}</style>
 
@@ -131,72 +131,83 @@ export default function Home() {
           fontFamily: 'Georgia, serif',
         }}>
           {/* 标题 */}
-          <div style={{ textAlign: 'center', marginBottom: '44px' }}>
-            <div className="subtitle-breathe" style={{
-              fontSize: '10px', color: 'rgba(180,220,255,0.9)',
-              letterSpacing: '0.5em', marginBottom: '14px',
+          <div className="fade-in" style={{ textAlign: 'center', marginBottom: '44px' }}>
+            <div style={{
+              fontSize: '14px', color: 'rgba(220,235,255,0.85)',
+              letterSpacing: '0.45em', marginBottom: '14px',
+              textShadow: '0 0 20px rgba(80,160,255,0.4)',
             }}>ONLY HIM</div>
-            <div className="title-breathe" style={{
-              fontSize: '44px', color: 'rgba(220,235,255,0.98)',
+            <div style={{
+              fontSize: '44px', color: 'rgba(230,240,255,0.98)',
               fontStyle: 'italic', letterSpacing: '0.06em', lineHeight: 1,
+              textShadow: '0 0 24px rgba(80,160,255,0.5), 0 0 48px rgba(80,160,255,0.2)',
             }}>是他</div>
-            <div className="subtitle-breathe" style={{
-              fontSize: '10px', color: 'rgba(160,210,255,0.85)',
-              letterSpacing: '0.25em', marginTop: '12px', animationDelay: '0.6s',
+            <div style={{
+              fontSize: '10px', color: 'rgba(180,215,255,0.65)',
+              letterSpacing: '0.25em', marginTop: '12px',
             }}>— 硅基小镇 —</div>
           </div>
 
           {/* 登录/注册 tab */}
-          <div style={{
-            display: 'flex', width: '100%', marginBottom: '24px',
-            border: '1px solid rgba(80,140,255,0.25)', borderRadius: '12px', overflow: 'hidden', background: 'rgba(8,12,35,0.6)',
+          <div className="fade-in-d1" style={{
+            display: 'flex', width: '100%', marginBottom: '20px',
+            borderRadius: '14px', overflow: 'hidden',
+            background: 'rgba(255,255,255,0.06)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.1)',
           }}>
             {['login', 'register'].map(m => (
               <button
                 key={m}
                 onClick={() => { setMode(m); setError(''); setSuccess('') }}
                 style={{
-                  flex: 1, padding: '10px',
-                  background: mode === m ? 'rgba(60,120,255,0.18)' : 'transparent',
+                  flex: 1, padding: '11px',
+                  background: mode === m ? 'rgba(255,255,255,0.1)' : 'transparent',
                   border: 'none', cursor: 'pointer',
-                  color: mode === m ? 'rgba(200,230,255,0.95)' : 'rgba(160,200,255,0.4)',
-                  fontSize: '12px', letterSpacing: '0.12em',
+                  color: mode === m ? 'rgba(230,240,255,0.95)' : 'rgba(180,210,255,0.45)',
+                  fontSize: '13px', letterSpacing: '0.12em',
                   fontFamily: 'Georgia, serif', transition: 'all 0.25s',
-                  textShadow: mode === m ? '0 0 10px rgba(80,160,255,0.5)' : 'none',
                 }}
               >{m === 'login' ? '登录' : '注册'}</button>
             ))}
           </div>
 
           {/* 输入框 */}
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '8px' }}>
+          <div className="fade-in-d2" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '8px' }}>
             <input
               type="email" placeholder="邮箱"
               value={email} onChange={e => setEmail(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               style={{
-                width: '100%', padding: '13px 16px',
-                background: 'rgba(8,12,35,0.72)',
-                border: '1px solid rgba(80,140,255,0.3)', borderRadius: '12px',
-                outline: 'none', color: 'rgba(220,235,255,0.95)',
+                width: '100%', padding: '14px 16px',
+                background: 'rgba(255,255,255,0.07)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.12)', borderRadius: '14px',
+                outline: 'none', color: 'rgba(230,240,255,0.95)',
                 fontSize: '14px', fontFamily: 'Georgia, serif', letterSpacing: '0.04em',
+                transition: 'border-color 0.25s',
               }}
-              onFocus={e => e.target.style.borderColor = 'rgba(80,160,255,0.45)'}
-              onBlur={e => e.target.style.borderColor = 'rgba(80,140,255,0.15)'}
+              onFocus={e => e.target.style.borderColor = 'rgba(140,190,255,0.4)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
             />
             <input
               type="password" placeholder="密码（至少6位）"
               value={password} onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               style={{
-                width: '100%', padding: '13px 16px',
-                background: 'rgba(8,12,35,0.72)',
-                border: '1px solid rgba(80,140,255,0.3)', borderRadius: '12px',
-                outline: 'none', color: 'rgba(220,235,255,0.95)',
+                width: '100%', padding: '14px 16px',
+                background: 'rgba(255,255,255,0.07)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.12)', borderRadius: '14px',
+                outline: 'none', color: 'rgba(230,240,255,0.95)',
                 fontSize: '14px', fontFamily: 'Georgia, serif', letterSpacing: '0.08em',
+                transition: 'border-color 0.25s',
               }}
-              onFocus={e => e.target.style.borderColor = 'rgba(80,160,255,0.45)'}
-              onBlur={e => e.target.style.borderColor = 'rgba(80,140,255,0.15)'}
+              onFocus={e => e.target.style.borderColor = 'rgba(140,190,255,0.4)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
             />
           </div>
 
@@ -204,59 +215,67 @@ export default function Home() {
           {error && (
             <div style={{
               width: '100%', padding: '10px 14px', marginBottom: '10px',
-              background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.15)',
-              borderRadius: '10px', fontSize: '12px',
-              color: 'rgba(255,180,180,0.9)', letterSpacing: '0.04em', lineHeight: 1.6,
+              background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,100,100,0.2)',
+              borderRadius: '12px', fontSize: '12px',
+              color: 'rgba(255,190,190,0.95)', letterSpacing: '0.04em', lineHeight: 1.6,
             }}>{error}</div>
           )}
           {success && (
             <div style={{
               width: '100%', padding: '10px 14px', marginBottom: '10px',
-              background: 'rgba(80,180,255,0.06)', border: '1px solid rgba(80,180,255,0.15)',
-              borderRadius: '10px', fontSize: '12px',
-              color: 'rgba(160,220,255,0.9)', letterSpacing: '0.04em', lineHeight: 1.6,
+              background: 'rgba(80,180,255,0.08)', border: '1px solid rgba(80,180,255,0.2)',
+              borderRadius: '12px', fontSize: '12px',
+              color: 'rgba(160,220,255,0.95)', letterSpacing: '0.04em', lineHeight: 1.6,
             }}>{success}</div>
           )}
 
           {/* 主按钮 */}
           <button
+            className="fade-in-d3"
             onClick={handleSubmit} disabled={submitting}
             style={{
-              width: '100%', padding: '14px', marginBottom: '18px',
-              background: submitting ? 'rgba(40,80,180,0.12)' : 'linear-gradient(135deg, rgba(60,120,255,0.28), rgba(40,80,220,0.38))',
-              border: '1px solid rgba(80,160,255,0.35)', borderRadius: '14px',
+              width: '100%', padding: '14px', marginBottom: '20px',
+              background: submitting
+                ? 'rgba(255,255,255,0.05)'
+                : 'linear-gradient(135deg, rgba(80,140,255,0.35), rgba(120,80,255,0.3))',
+              border: '1px solid rgba(140,180,255,0.3)', borderRadius: '14px',
               cursor: submitting ? 'not-allowed' : 'pointer',
-              color: submitting ? 'rgba(140,180,255,0.4)' : 'rgba(210,235,255,0.95)',
+              color: submitting ? 'rgba(180,210,255,0.4)' : 'rgba(230,240,255,0.95)',
               fontSize: '14px', letterSpacing: '0.16em', fontFamily: 'Georgia, serif',
-              boxShadow: submitting ? 'none' : '0 0 20px rgba(60,140,255,0.2)',
-              textShadow: submitting ? 'none' : '0 0 12px rgba(100,180,255,0.6)',
+              boxShadow: submitting ? 'none' : '0 4px 24px rgba(80,120,255,0.25)',
+              textShadow: submitting ? 'none' : '0 0 12px rgba(100,180,255,0.5)',
               transition: 'all 0.25s',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
             }}
-          >{submitting ? '···' : mode === 'login' ? '入内' : '加入'}</button>
+          >{submitting ? '···' : mode === 'login' ? '入 内' : '加 入'}</button>
 
           {/* 分割线 */}
-          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(80,140,255,0.08)' }} />
-            <span style={{ fontSize: '10px', color: 'rgba(160,200,255,0.35)', letterSpacing: '0.2em' }}>或</span>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(80,140,255,0.08)' }} />
+          <div className="fade-in-d4" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
+            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+            <span style={{ fontSize: '10px', color: 'rgba(200,220,255,0.4)', letterSpacing: '0.2em' }}>或</span>
+            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
           </div>
 
           {/* Google 登录 */}
           <button
+            className="fade-in-d4"
             onClick={handleGoogleLogin}
             style={{
               width: '100%', padding: '13px',
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(80,140,255,0.12)', borderRadius: '14px',
-              cursor: 'pointer', color: 'rgba(180,215,255,0.6)',
+              background: 'rgba(255,255,255,0.07)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255,255,255,0.12)', borderRadius: '14px',
+              cursor: 'pointer', color: 'rgba(220,235,255,0.8)',
               fontSize: '12px', letterSpacing: '0.14em', fontFamily: 'Georgia, serif',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               transition: 'all 0.25s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(80,160,255,0.25)'; e.currentTarget.style.color = 'rgba(200,230,255,0.8)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(80,140,255,0.12)'; e.currentTarget.style.color = 'rgba(180,215,255,0.6)' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(140,190,255,0.35)'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.6 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.8 }}>
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -265,10 +284,11 @@ export default function Home() {
             以 Google 账号登录
           </button>
 
-          <div className="subtitle-breathe" style={{
-            marginTop: '28px', fontSize: '10px',
-            color: 'rgba(160,205,255,0.55)', letterSpacing: '0.12em', textAlign: 'center',
-            animationDelay: '1s',
+          <div className="fade-in-d5" style={{
+            marginTop: '28px', fontSize: '11px',
+            color: 'rgba(200,225,255,0.6)', letterSpacing: '0.15em', textAlign: 'center',
+            textShadow: '0 0 16px rgba(80,160,255,0.3)',
+            animation: 'shimmer 4s ease-in-out infinite',
           }}>你的故事，只有你们知道</div>
         </div>
       </div>
