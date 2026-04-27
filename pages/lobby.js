@@ -190,7 +190,7 @@ export default function Lobby() {
                     opacity: isActive ? 1 : 0.38,
                     transform: isActive ? 'scale(1)' : 'scale(0.86)',
                     boxShadow: isActive
-                      ? `0 0 40px ${glowColor}, 0 0 80px rgba(60,120,255,0.08), 0 20px 50px rgba(0,0,0,0.7)`
+                      ? `0 0 25px ${glowColor}, 0 0 50px ${glowColor}`
                       : 'none',
                     ...(isCustom ? {
                       background: isActive ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
@@ -214,7 +214,7 @@ export default function Lobby() {
                     flexShrink: 0, scrollSnapAlign: 'center', position: 'relative',
                     borderRadius: '22px', transition: 'all 0.4s cubic-bezier(0.34,1.4,0.64,1)',
                     boxShadow: isActive
-                      ? `0 0 45px ${glowColor}, 0 0 90px ${glowColor.replace('0.2)', '0.12)').replace('0.45)', '0.15)')}, 0 20px 50px rgba(0,0,0,0.6)`
+                      ? `0 0 30px ${glowColor}, 0 0 60px ${glowColor}, 0 0 100px ${glowColor.replace('0.45)', '0.2)').replace('0.3)', '0.15)').replace('0.2)', '0.1)')}`
                       : 'none',
                   }
                   const cardStyleNoGlow = { ...cardStyle, boxShadow: 'none', flexShrink: 0, scrollSnapAlign: 'unset' }

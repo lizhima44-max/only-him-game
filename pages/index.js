@@ -74,13 +74,55 @@ export default function Home() {
     else handleEmailRegister()
   }
 
+  // 氛围句子
+  const loadingLines = [
+    '他在某个时空，等你很久了。',
+    '有些相遇，是命中注定。',
+    '你听见了吗？他在叫你的名字。',
+    '故事的开头，总是一场意外。',
+    '他说，这次不会再让你走了。',
+    '月光替他藏好了所有秘密。',
+  ]
+  const [lineIdx, setLineIdx] = useState(0)
+  const [lineFade, setLineFade] = useState(true)
+
+  useEffect(() => {
+    if (!loading) return
+    const interval = setInterval(() => {
+      setLineFade(false)
+      setTimeout(() => {
+        setLineIdx(prev => (prev + 1) % loadingLines.length)
+        setLineFade(true)
+      }, 600)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [loading])
+
   // 加载中
   if (loading) return (
     <div style={{
       position: 'fixed', inset: 0, background: '#020108',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: 'rgba(160,210,255,0.6)', fontFamily: 'Georgia, serif', fontSize: '14px',
-    }}>···</div>
+      fontFamily: 'Georgia, serif',
+    }}>
+      <img src="/assets/lobby/lobby_bg.png" alt="" style={{
+        position: 'absolute', inset: 0, width: '100%', height: '100%',
+        objectFit: 'cover', objectPosition: 'center', zIndex: 0,
+        pointerEvents: 'none', opacity: 0.6,
+      }} />
+      <div style={{
+        position: 'relative', zIndex: 10, textAlign: 'center', padding: '0 40px',
+      }}>
+        <div style={{
+          fontSize: '13px', color: 'rgba(220,235,255,0.85)',
+          letterSpacing: '0.2em', lineHeight: 2.2,
+          textShadow: '0 0 20px rgba(80,160,255,0.5), 0 2px 12px rgba(0,0,0,0.5)',
+          opacity: lineFade ? 1 : 0,
+          transform: lineFade ? 'translateY(0)' : 'translateY(6px)',
+          transition: 'all 0.6s ease',
+        }}>{loadingLines[lineIdx]}</div>
+      </div>
+    </div>
   )
 
   return (
@@ -286,8 +328,8 @@ export default function Home() {
 
           <div className="fade-in-d5" style={{
             marginTop: '28px', fontSize: '11px',
-            color: 'rgba(200,225,255,0.6)', letterSpacing: '0.15em', textAlign: 'center',
-            textShadow: '0 0 16px rgba(80,160,255,0.3)',
+            color: 'rgba(230,240,255,0.85)', letterSpacing: '0.15em', textAlign: 'center',
+            textShadow: '0 0 16px rgba(20,10,60,0.9), 0 0 32px rgba(10,5,40,0.7), 0 0 8px rgba(80,160,255,0.4)',
             animation: 'shimmer 4s ease-in-out infinite',
           }}>你的故事，只有你们知道</div>
         </div>
