@@ -175,7 +175,7 @@ export default function Lobby() {
             </div>
 
             {/* 卡牌区 */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden', paddingTop: '0', marginTop: '-30px' }}>
               <div style={{
                 position: 'absolute', left: 0, top: 0, bottom: 0, width: '70px', zIndex: 5,
                 background: 'linear-gradient(to right, rgba(2,1,12,0.95), transparent)',
@@ -219,12 +219,12 @@ export default function Lobby() {
                       ? `0 0 40px ${glowColor}, 0 0 80px rgba(60,120,255,0.08), 0 20px 50px rgba(0,0,0,0.7)`
                       : 'none',
                     ...(isCustom ? {
-                      background: isActive ? 'rgba(20,35,65,0.45)' : 'rgba(10,18,40,0.3)',
+                      background: isActive ? 'rgba(15,28,60,0.35)' : 'rgba(8,14,35,0.18)',
                       backdropFilter: 'blur(18px)',
                       WebkitBackdropFilter: 'blur(18px)',
                       border: isActive ? '1px solid rgba(160,210,255,0.35)' : '1px dashed rgba(140,200,255,0.1)',
                     } : isPlaceholder ? {
-                      background: isActive ? 'rgba(20,30,60,0.45)' : 'rgba(10,15,35,0.3)',
+                      background: isActive ? 'rgba(15,25,55,0.35)' : 'rgba(8,12,28,0.18)',
                       backdropFilter: 'blur(18px)',
                       WebkitBackdropFilter: 'blur(18px)',
                       border: isActive ? '1px solid rgba(140,190,255,0.3)' : '1px solid rgba(100,150,255,0.08)',
@@ -236,8 +236,18 @@ export default function Lobby() {
                     }),
                   }
 
+                  const glowWrapStyle = {
+                    flexShrink: 0, scrollSnapAlign: 'center', position: 'relative',
+                    borderRadius: '22px', transition: 'all 0.4s cubic-bezier(0.34,1.4,0.64,1)',
+                    boxShadow: isActive
+                      ? `0 0 45px ${glowColor}, 0 0 90px ${glowColor.replace('0.2)', '0.12)').replace('0.45)', '0.15)')}, 0 20px 50px rgba(0,0,0,0.6)`
+                      : 'none',
+                  }
+                  const cardStyleNoGlow = { ...cardStyle, boxShadow: 'none', flexShrink: 0, scrollSnapAlign: 'unset' }
+
                   return (
-                    <div key={char.id} style={cardStyle} onClick={() => handleCardClick(char)}>
+                    <div key={char.id} style={glowWrapStyle} onClick={() => handleCardClick(char)}>
+                    <div style={cardStyleNoGlow}>
                       {/* 顶部高光线（系统角色才有） */}
                       {!isCustom && !isPlaceholder && theme && (
                         <div style={{
@@ -346,6 +356,7 @@ export default function Lobby() {
                           </div>
                         </>
                       )}
+                    </div>
                     </div>
                   )
                 })}
