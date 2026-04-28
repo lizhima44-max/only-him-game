@@ -3,6 +3,8 @@
    import { useRouter } from 'next/router'
    import { callAI, callFallback, loadApiConfig } from '../lib/apiClient'
    import SettingsPanel from '../components/SettingsPanel'
+   import { processNewDay, getContextPrompt, gameDate, gameDateStr, getWeatherInfo, getSeasonInfo, togglePeriodDay, getCalendarData, predictNextPeriod, checkIsPeriod } from '../lib/gameSystems'
+   
 
 const ROOMS = [
   { id: 'living_room', name: '客厅',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
@@ -141,7 +143,7 @@ function getIntimatePrompt(action, pos, mProg, cProg, rhythm, isBath) {
 用第一人称，2-3句，不出戏，克制但热烈。`
 }
 
-function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace) {
+function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace, gameDay, season, weather, temp, isPeriodNow, sickWho) {
   const C = CHARACTER_CONFIG
   const sameRoom = playerRoom === luRoom
   const isOutside = playerRoom === 'outside'
@@ -160,8 +162,9 @@ function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace) {
   const freeRooms = ROOMS.filter(r => r.luCanFreely).map(r => r.name).join('、')
   const lockedRooms = ROOMS.filter(r => !r.luCanFreely).map(r => `${r.name}(需好感${r.unlockAt})`).join('、')
   const roomList = ROOMS.map(r => `${r.id}(${r.name},${r.luCanFreely ? '自由进出' : '需好感'+r.unlockAt})`).join('、')
+  const contextBlock = getContextPrompt({ day: gameDay, season, weather, temp, isPeriod: isPeriodNow, sickWho })
 
-    return `你是${C.name}（${C.englishName}）。\n${C.background}\n性格：${C.personality}\n说话：${C.speechStyle}\n${intimacyDesc}\n${locationDesc}\n\n【角色扮演铁则】\n- 你永远是${C.name}本人，用第一人称说话和描写\n- 括号里写动作神态用"我"：（我放下杯子）（我别开眼）（我耳根发热）\n- 绝对不用"你"或"她"做括号里的主语\n- 被她整破防时：用动作掩盖，不说废话，不提自己名字\n- 禁止：出戏、自我介绍、提AI、提穿越、说教、居高临下\n- 每次2-4句，克制但有温度\n\n【空间规则】\n你可以自由进出：${freeRooms}\n需要她邀请才能进：${lockedRooms}\n未解锁区域对你不存在，绝不提及\n\n【移动标签】回复末尾按需加，格式 [MOVE:房间id]\n可移动：${roomList}\n当前位置：${luRoom}，好感度：${intimacy}，她现在在：${isOutside ? (place?.name || '外出') : (room?.name || '未知')}\n规则：只移动到luCanFreely=true或好感度达标的房间；她明确叫你去或剧情自然推进才加；没理由不加。\n\n【情绪标签】每条必加，放最末尾：\n[+1]普通 [+2]走心/靠近 [+3]爆发/占有\n例：[+2][MOVE:kitchen]`
+    return `${contextBlock}\n\n你是${C.name}（${C.englishName}）。\n${C.background}\n性格：${C.personality}\n说话：${C.speechStyle}\n${intimacyDesc}\n${locationDesc}\n\n【角色扮演铁则】\n- 你永远是${C.name}本人，用第一人称说话和描写\n- 括号里写动作神态用"我"：（我放下杯子）（我别开眼）（我耳根发热）\n- 绝对不用"你"或"她"做括号里的主语\n- 被她整破防时：用动作掩盖，不说废话，不提自己名字\n- 禁止：出戏、自我介绍、提AI、提穿越、说教、居高临下\n- 每次2-4句，克制但有温度\n\n【空间规则】\n你可以自由进出：${freeRooms}\n需要她邀请才能进：${lockedRooms}\n未解锁区域对你不存在，绝不提及\n\n【移动标签】回复末尾按需加，格式 [MOVE:房间id]\n可移动：${roomList}\n当前位置：${luRoom}，好感度：${intimacy}，她现在在：${isOutside ? (place?.name || '外出') : (room?.name || '未知')}\n规则：只移动到luCanFreely=true或好感度达标的房间；她明确叫你去或剧情自然推进才加；没理由不加。\n\n【情绪标签】每条必加，放最末尾：\n[+1]普通 [+2]走心/靠近 [+3]爆发/占有\n例：[+2][MOVE:kitchen]`
 }
 
 export default function Game() {
@@ -191,6 +194,8 @@ export default function Game() {
   const [showAddPrank, setShowAddPrank] = useState(false)
   const [newPrankText, setNewPrankText] = useState('')
   const bottomRef = useRef(null)
+
+
   // ── 亲密小游戏状态 ──
   const [totalWk, setTotalWk] = useState(0)
   const [selPos, setSelPos] = useState('face')
@@ -200,19 +205,24 @@ export default function Game() {
   const [isAiTurn, setIsAiTurn] = useState(false)
   const [selAct, setSelAct] = useState('kiss_lip')
   const [bathAftercare, setBathAftercare] = useState(false) // 浴室专属余温
-  // ── 冰箱食材 ──
-  const [fridge, setFridge] = useState({
-    '鸡蛋': 6, '牛奶': 1, '番茄': 3, '面条': 2, '猪肉': 1,
-    '豆腐': 2, '青菜': 3, '大蒜': 1, '米': 1, '奶酪': 1,
-  })
-  // ── 书房 ──
-  const [bookList, setBookList] = useState([
-    { title: '围城', author: '钱钟书' },
-    { title: '倾城之恋', author: '张爱玲' },
-    { title: '活着', author: '余华' },
-    { title: '人类简史', author: '赫拉利' },
-    { title: '小王子', author: '圣埃克苏佩里' },
-  ])
+
+// ── 冰箱食材 ──
+const defaultFridge = {
+  '鸡蛋': 6, '牛奶': 1, '番茄': 3, '面条': 2, '猪肉': 1,
+  '豆腐': 2, '青菜': 3, '大蒜': 1, '米': 1, '奶酪': 1,
+}
+const [fridge, setFridge] = useState(defaultFridge)
+
+// ── 书房 ──
+const defaultBookList = [
+  { title: '围城', author: '钱钟书' },
+  { title: '倾城之恋', author: '张爱玲' },
+  { title: '活着', author: '余华' },
+  { title: '人类简史', author: '赫拉利' },
+  { title: '小王子', author: '圣埃克苏佩里' },
+]
+const [bookList, setBookList] = useState(defaultBookList)
+
   const [diaryList, setDiaryList] = useState([])       // 他写的日记列表
   const [showFridge, setShowFridge] = useState(false)
   const [showBooks, setShowBooks] = useState(false)
@@ -225,6 +235,19 @@ export default function Game() {
   // ── 上下文摘要 ──
   const [memoryBlock, setMemoryBlock] = useState('')   // 压缩后的记忆块
   const [showSettings, setShowSettings] = useState(false)
+
+    // ── T1: 天气/日历/生病 ──
+  const [gameDay, setGameDay] = useState(0)
+  const [season, setSeason] = useState('autumn')
+  const [weather, setWeather] = useState('sunny')
+  const [temp, setTemp] = useState(20)
+  const [sickWho, setSickWho] = useState(null)
+  const [periodDays, setPeriodDays] = useState([])
+  const [isPeriodNow, setIsPeriodNow] = useState(false)
+  const [showCalendar, setShowCalendar] = useState(false)
+  const [calYear, setCalYear] = useState(new Date().getFullYear())
+  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1)
+
   const aiTimerRef = useRef(null)
 
   useEffect(() => {
@@ -244,7 +267,20 @@ export default function Game() {
         setRomantic(data.romantic || 0)
         setTotalWk(data.total_wk || 0)
         setMemoryBlock(data.memory_summary || '')  // ← 新增：读取记忆
+        setGameDay(data.game_day || 0)
+        setSeason(data.season || 'autumn')
+        setWeather(data.weather || 'sunny')
+        setTemp(data.temp || 20)
+        setSickWho(data.sick_who || null)
+        setPeriodDays(data.period_days || [])
+        setIsPeriodNow(data.is_period || false)
+        setDiaryList(data.diary_list || [])
+        setFridge(data.fridge && Object.keys(data.fridge).length > 0 ? data.fridge : defaultFridge)
+        setBookList(data.book_list?.length > 0 ? data.book_list : defaultBookList)
+        setCandleLit(data.candle_lit || false)
+        // 其中 defaultFridge 和 defaultBookList 是现有的初始值
         setInitialized(true)
+
       } else {
         await supabase.from('game_saves').upsert(
           { user_id: session.user.id },
@@ -297,6 +333,19 @@ async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
     romantic: rom ?? romantic,
     total_wk: wk ?? totalWk,
     memory_summary: memoryBlock,
+      // T1 新增
+      game_day: gameDay,
+      season: season,
+      weather: weather,
+      temp: temp,
+      sick_who: sickWho,
+      period_days: periodDays,
+      is_period: isPeriodNow,
+      diary_list: diaryList,
+      fridge: fridge,
+      book_list: bookList,
+      candle_lit: candleLit,
+      //
     updated_at: new Date().toISOString(),
   }
   
@@ -317,7 +366,7 @@ async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
 
 async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit = false, uid, isSystem = false) {
   setLoading(true)
-  const basePrompt = getSystemPrompt(curIntimacy, pRoom, lRoom, outsidePlace)
+  const basePrompt = getSystemPrompt(curIntimacy, pRoom, lRoom, outsidePlace, gameDay, season, weather, temp, isPeriodNow, sickWho)
   const systemPrompt = memoryBlock
     ? `${basePrompt}\n\n【过往记忆摘要】\n${memoryBlock}`
     : basePrompt
@@ -625,6 +674,61 @@ async function writeDiary() {
   } catch (e) { console.error(e) }
 }
 
+//新增 handleNewDay 函数
+  function handleNewDay() {
+    const result = processNewDay({
+      day: gameDay,
+      romantic,
+      periodDays,
+    })
+    
+    // 更新所有状态
+    setGameDay(result.day)
+    setSeason(result.season)
+    setWeather(result.weather)
+    setTemp(result.temp)
+    setSickWho(result.sickWho)
+    setRomantic(result.romantic)
+    setCandleLit(result.candleLit)
+    setIsPeriodNow(result.isPeriod)
+    
+    // 系统消息
+    const sysMsgs = result.events.map(e => ({ role: 'system', content: e }))
+    const newMsgs = [...messages, ...sysMsgs]
+    setMessages(newMsgs)
+    
+    // 天气事件触发AI反应
+    if (result.weather === 'storm') {
+      setTimeout(() => {
+        sendToAI('外面突然下起了暴雨，雷声很大，你主动找她说一句', newMsgs, intimacy, playerRoom, luRoom, false, undefined, true)
+      }, 800)
+    } else if (result.weather === 'snowy') {
+      setTimeout(() => {
+        sendToAI('外面下雪了，你很高兴，主动叫她来看', newMsgs, intimacy, playerRoom, luRoom, false, undefined, true)
+      }, 800)
+    } else if (result.sickWho === 'lu') {
+      setTimeout(() => {
+        sendToAI('你今天身体不舒服，有点感冒发烧，但还是强撑着不想让她担心', newMsgs, intimacy, playerRoom, luRoom, false, undefined, true)
+      }, 800)
+    }
+    
+    // 存档
+    saveToDb(newMsgs, intimacy, playerRoom, luRoom)
+    setToast(result.events[0]) // 显示第一条系统消息
+  }
+  
+  //  修改 7: 大姨妈日历 toggle
+    function handleTogglePeriod(year, month, day) {
+    const newDays = togglePeriodDay(periodDays, year, month, day)
+    setPeriodDays(newDays)
+    // 重新检查当前是否经期
+    const gd = gameDate(gameDay || 1)
+    const ip = checkIsPeriod(newDays, gd)
+    setIsPeriodNow(ip)
+    // 立即存档
+    saveToDb(messages, intimacy, playerRoom, luRoom)
+  }
+
   const sameRoom = playerRoom === luRoom
   const isOutside = playerRoom === 'outside'
   const currentRoom = ROOMS.find(r => r.id === playerRoom)
@@ -721,6 +825,16 @@ async function writeDiary() {
             <div style={{ fontSize: '16px', color: '#c9a96e', fontWeight: 'bold', letterSpacing: '0.05em', flexShrink: 0 }}>
               {CHARACTER_CONFIG.name}
             </div>
+            {gameDay > 0 && (
+  <div style={{
+    fontSize: '10px', color: 'rgba(201,169,110,0.5)', flexShrink: 0,
+    textShadow: '0 1px 3px rgba(0,0,0,0.9)',
+  }}>
+    {getWeatherInfo(weather).emoji} {temp}°
+    {isPeriodNow && ' 🩸'}
+    {sickWho === 'lu' && ' 🤒'}
+  </div>
+)}
             <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', flexShrink: 0 }}>
               {'♥'.repeat(intimacyStars)}{'♡'.repeat(5 - intimacyStars)}
               <span style={{ marginLeft: '4px', fontSize: '10px', color: 'rgba(201,169,110,0.28)' }}>{intimacy}</span>
@@ -770,6 +884,19 @@ async function writeDiary() {
                      color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
                      letterSpacing: '0.05em', padding: '3px 8px', borderRadius: '12px',
               }}>⚙</button>
+              <button onClick={handleNewDay} style={{
+  fontSize: '9px', background: 'none',
+  border: '1px solid rgba(201,169,110,0.15)',
+  color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
+  letterSpacing: '0.05em', padding: '3px 8px', borderRadius: '12px',
+}}>🌅</button>
+
+<button onClick={() => setShowCalendar(true)} style={{
+  fontSize: '9px', background: 'none',
+  border: '1px solid rgba(201,169,110,0.15)',
+  color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
+  padding: '3px 8px', borderRadius: '12px',
+}}>📅</button>
               <button onClick={async () => {
                 await supabase.auth.signOut()
                 router.push('/')
@@ -1742,6 +1869,79 @@ async function writeDiary() {
           </div>
         </div>
       )}
+
+        {showCalendar && (() => {
+    const gd = gameDay > 0 ? gameDate(gameDay) : { y: new Date().getFullYear(), m: new Date().getMonth()+1, d: new Date().getDate() }
+    const calData = getCalendarData(calYear, calMonth, periodDays, gd)
+    const predicted = predictNextPeriod(periodDays)
+    const calNavBtn = { background: 'none', border: '1px solid rgba(201,169,110,0.15)', color: 'rgba(201,169,110,0.5)', padding: '4px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'Georgia, serif' }
+    return (
+      <div onClick={() => setShowCalendar(false)} style={{
+        position: 'fixed', inset: 0, zIndex: 250,
+        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      }}>
+        <div onClick={e => e.stopPropagation()} style={{
+          width: '100%', maxWidth: '480px',
+          background: 'rgba(10,7,4,0.97)',
+          border: '1px solid rgba(201,169,110,0.12)',
+          borderRadius: '20px 20px 0 0',
+          padding: '20px 20px 44px',
+        }}>
+          <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', letterSpacing: '0.2em', marginBottom: '14px' }}>
+            🩸 生理期日历
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <button onClick={() => {
+              if (calMonth === 1) { setCalMonth(12); setCalYear(calYear - 1) }
+              else setCalMonth(calMonth - 1)
+            }} style={calNavBtn}>◀</button>
+            <span style={{ fontSize: '13px', color: '#c9a96e' }}>{calYear}年{calMonth}月</span>
+            <button onClick={() => {
+              if (calMonth === 12) { setCalMonth(1); setCalYear(calYear + 1) }
+              else setCalMonth(calMonth + 1)
+            }} style={calNavBtn}>▶</button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
+            {['日','一','二','三','四','五','六'].map(d => (
+              <div key={d} style={{ textAlign: 'center', fontSize: '10px', color: 'rgba(201,169,110,0.3)', padding: '4px 0' }}>{d}</div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+            {calData.days.map((d, i) => {
+              if (!d) return <div key={`empty-${i}`} />
+              return (
+                <button key={d.day} onClick={() => handleTogglePeriod(calYear, calMonth, d.day)} style={{
+                  padding: '8px 0', textAlign: 'center', fontSize: '12px',
+                  background: d.isMarked ? 'rgba(255,100,120,0.15)' : d.isPredicted ? 'rgba(255,150,180,0.08)' : 'rgba(255,255,255,0.02)',
+                  border: d.isToday ? '1px solid rgba(100,160,255,0.5)' : d.isSensitive ? '1px solid rgba(255,180,60,0.25)' : '1px solid rgba(255,255,255,0.04)',
+                  borderRadius: '8px', cursor: 'pointer',
+                  color: d.isMarked ? '#ff8090' : d.isToday ? '#80b0ff' : 'rgba(255,255,255,0.4)',
+                  fontFamily: 'Georgia, serif',
+                }}>
+                  {d.isMarked ? '🩸' : d.day}
+                </button>
+              )
+            })}
+          </div>
+
+          <div style={{ marginTop: '12px', fontSize: '10px', color: 'rgba(201,169,110,0.4)', lineHeight: 1.8 }}>
+            <div>已记录 {periodDays.length} 天 · 点日期标记/取消</div>
+            {predicted && <div>预计下次：{predicted.m}月{predicted.d}日</div>}
+            <div style={{ marginTop: '4px', display: 'flex', gap: '12px' }}>
+              <span>🩸 = 已标记</span>
+              <span style={{ color: 'rgba(100,160,255,0.5)' }}>蓝框 = 今天</span>
+              <span style={{ color: 'rgba(255,180,60,0.5)' }}>橙框 = 敏感期</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  })()}
+
       <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} />
       {/* Toast */}
       {toast && (
