@@ -197,6 +197,7 @@ export default function Game() {
   const [customPranks, setCustomPranks] = useState([])
   const [showAddPrank, setShowAddPrank] = useState(false)
   const [newPrankText, setNewPrankText] = useState('')
+  const [superTab, setSuperTab] = useState('staple')
   const bottomRef = useRef(null)
 
 
@@ -2161,7 +2162,6 @@ setCoins(prev => prev + 50)
     { id: 'pet', label: '🐾 宠物', items: SUPERMARKET_ITEMS.filter(i => i.category === 'pet') },
     { id: 'life', label: '🩹 生活', items: SUPERMARKET_ITEMS.filter(i => i.category === 'life') },
   ]
-  const [superTab, setSuperTab] = useState('staple')
   const currentCat = categories.find(c => c.id === superTab)
   
   const getCartQty = (id) => cart.find(c => c.id === id)?.qty || 0
