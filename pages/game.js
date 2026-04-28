@@ -6,6 +6,9 @@
    import { processNewDay, getContextPrompt, gameDate, gameDateStr, getWeatherInfo, getSeasonInfo, togglePeriodDay, getCalendarData, predictNextPeriod, checkIsPeriod } from '../lib/gameSystems'
    import { ALL_OUTFITS, getOwnedOutfits, getOutfitHint,
          ALL_BEDSIDE_ITEMS, getOwnedBedsideItems } from '../lib/wardrobeItems'
+   import { SUPERMARKET_ITEMS, SHOP_CATEGORIES, HER_OUTFITS, GIFTS, getShopItems,
+         PETS, createPet, updatePetDaily, feedPet, bathePet, strokePet,
+         getPetContextPrompt, getPetRandomAct } from '../lib/shopAndPet'        
 
 const ROOMS = [
   { id: 'living_room', name: '客厅',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
@@ -166,7 +169,8 @@ export default function Game() {
   const roomList = ROOMS.map(r => `${r.id}(${r.name},${r.luCanFreely ? '自由进出' : '需好感'+r.unlockAt})`).join('、')
   const contextBlock = getContextPrompt({ day: gameDay, season, weather, temp, isPeriod: isPeriodNow, sickWho })
   const outfitHint = getOutfitHint(currentOutfit)
-    return `${contextBlock}\n\n${outfitHint}\n\n你是${C.name}（${C.englishName}）。\n${C.background}\n性格：${C.personality}\n说话：${C.speechStyle}\n${intimacyDesc}\n${locationDesc}\n\n【角色扮演铁则】\n- 你永远是${C.name}本人，用第一人称说话和描写\n- 括号里写动作神态用"我"：（我放下杯子）（我别开眼）（我耳根发热）\n- 绝对不用"你"或"她"做括号里的主语\n- 被她整破防时：用动作掩盖，不说废话，不提自己名字\n- 禁止：出戏、自我介绍、提AI、提穿越、说教、居高临下\n- 每次2-4句，克制但有温度\n\n【空间规则】\n你可以自由进出：${freeRooms}\n需要她邀请才能进：${lockedRooms}\n未解锁区域对你不存在，绝不提及\n\n【移动标签】回复末尾按需加，格式 [MOVE:房间id]\n可移动：${roomList}\n当前位置：${luRoom}，好感度：${intimacy}，她现在在：${isOutside ? (place?.name || '外出') : (room?.name || '未知')}\n规则：只移动到luCanFreely=true或好感度达标的房间；她明确叫你去或剧情自然推进才加；没理由不加。\n\n【情绪标签】每条必加，放最末尾：\n[+1]普通 [+2]走心/靠近 [+3]爆发/占有\n例：[+2][MOVE:kitchen]`
+  const petCtx = getPetContextPrompt(pet)
+    return `${contextBlock}\n\n${outfitHint}\n\n${petCtx}\n\n你是${C.name}（${C.englishName}）。\n${C.background}\n性格：${C.personality}\n说话：${C.speechStyle}\n${intimacyDesc}\n${locationDesc}\n\n【角色扮演铁则】\n- 你永远是${C.name}本人，用第一人称说话和描写\n- 括号里写动作神态用"我"：（我放下杯子）（我别开眼）（我耳根发热）\n- 绝对不用"你"或"她"做括号里的主语\n- 被她整破防时：用动作掩盖，不说废话，不提自己名字\n- 禁止：出戏、自我介绍、提AI、提穿越、说教、居高临下\n- 每次2-4句，克制但有温度\n\n【空间规则】\n你可以自由进出：${freeRooms}\n需要她邀请才能进：${lockedRooms}\n未解锁区域对你不存在，绝不提及\n\n【移动标签】回复末尾按需加，格式 [MOVE:房间id]\n可移动：${roomList}\n当前位置：${luRoom}，好感度：${intimacy}，她现在在：${isOutside ? (place?.name || '外出') : (room?.name || '未知')}\n规则：只移动到luCanFreely=true或好感度达标的房间；她明确叫你去或剧情自然推进才加；没理由不加。\n\n【情绪标签】每条必加，放最末尾：\n[+1]普通 [+2]走心/靠近 [+3]爆发/占有\n例：[+2][MOVE:kitchen]`
 }
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -253,7 +257,17 @@ const [bookList, setBookList] = useState(defaultBookList)
   const [bedsideItems, setBedsideItems] = useState([])
   const [showWardrobe, setShowWardrobe] = useState(false)
   const [showBedside, setShowBedside] = useState(false)
-
+  // ── 商场/超市/宠物 ──
+const [coins, setCoins] = useState(500)
+const [pet, setPet] = useState(null)
+const [showShop, setShowShop] = useState(false)
+const [showSupermarket, setShowSupermarket] = useState(false)
+const [showPetPanel, setShowPetPanel] = useState(false)
+const [showAdopt, setShowAdopt] = useState(false)
+const [shopTab, setShopTab] = useState('his')
+const [petNameInput, setPetNameInput] = useState('')
+const [adoptingType, setAdoptingType] = useState(null)
+const [cart, setCart] = useState([])
   const aiTimerRef = useRef(null)
 
   useEffect(() => {
@@ -284,6 +298,8 @@ const [bookList, setBookList] = useState(defaultBookList)
         setFridge(data.fridge && Object.keys(data.fridge).length > 0 ? data.fridge : defaultFridge)
         setBookList(data.book_list?.length > 0 ? data.book_list : defaultBookList)
         setCandleLit(data.candle_lit || false)
+        setCoins(data.coins ?? 500)
+        setPet(data.pet || null)
         // 其中 defaultFridge 和 defaultBookList 是现有的初始值
         setWardrobe(data.wardrobe || ['daily_white', 'daily_black'])
         setCurrentOutfit(data.current_outfit || 'daily_white')
@@ -357,6 +373,8 @@ async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
       wardrobe: wardrobe,
       current_outfit: currentOutfit,
       bedside_items: bedsideItems,
+      coins: coins,
+      pet: pet,
       //
     updated_at: new Date().toISOString(),
   }
@@ -726,6 +744,23 @@ async function writeDiary() {
     
     // 存档
     saveToDb(newMsgs, intimacy, playerRoom, luRoom)
+    // 宠物更新
+if (pet) {
+  const updatedPet = updatePetDaily(pet)
+  setPet(updatedPet)
+  if (updatedPet.sick) {
+    result.events.push(`🤒 ${updatedPet.name}生病了！`)
+  }
+  // 30%概率宠物触发AI反应
+  if (Math.random() < 0.3) {
+    const act = getPetRandomAct(updatedPet)
+    setTimeout(() => {
+      sendToAI(act + '你自然提一句', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+    }, 800)
+  }
+}
+// 每日零花钱
+setCoins(prev => prev + 50)
     setToast(result.events[0]) // 显示第一条系统消息
   }
   
@@ -843,6 +878,7 @@ async function writeDiary() {
     textShadow: '0 1px 3px rgba(0,0,0,0.9)',
   }}>
     {getWeatherInfo(weather).emoji} {temp}°
+    <span style={{ fontSize: '10px', color: 'rgba(255,200,60,0.5)', marginLeft: '6px' }}>💰{coins}</span>
     {isPeriodNow && ' 🩸'}
     {sickWho === 'lu' && ' 🤒'}
   </div>
@@ -1078,6 +1114,7 @@ async function writeDiary() {
                     { label: '泡茶', prompt: '她去泡了杯茶，你注意到了，说一句' },
                     { label: '看电视', prompt: '她窝在沙发开始看电视，你在旁边，随口说一句' },
                     { label: '发呆', prompt: '她在客厅发呆，你看见了，说一句' },
+                    { label: pet ? (pet.name + ' ' + (PETS.find(p => p.id === pet.typeId)?.emoji || '🐾')) : '🐾 领养宠物', special: 'pet' },
                   ],
                   kitchen: [
                     { label: '一起做饭', special: 'cook' },
@@ -1116,6 +1153,13 @@ async function writeDiary() {
                 return (
                   <>
                     {acts.map(a => {
+                      if (a.special === 'pet') {
+  return (
+    <button key="pet" onClick={() => setShowPetPanel(true)} style={btnStyle()}>
+      {a.label}
+    </button>
+  )
+}
                       if (a.special === 'fridge') return (
                         <button key="fridge" onClick={() => setShowFridge(true)} style={btnStyle()}>冰箱</button>
                       )
@@ -1168,26 +1212,56 @@ async function writeDiary() {
                 const outsideActions = {
                   park:        [{ label: '散步', prompt: '你们在公园散步，你走在她旁边，说一句' }, { label: '坐草地', prompt: '她突然坐到草地上，你站在旁边，说一句' }],
                   cinema:      [{ label: '挑电影', prompt: '你们站在影院门口选电影，你说一句' }, { label: '买爆米花', prompt: '她去买爆米花，你跟着，说一句' }],
-                  mall:        [{ label: '逛逛', prompt: '她在商场橱窗前停下来，你说一句' }, { label: '帮我提包', prompt: '她把袋子塞给你，你接过来，说一句' }],
-                  supermarket: [{ label: '推车', prompt: '你接过了超市的购物车，说一句' }, { label: '挑东西', prompt: '她拿起什么东西在研究，你凑过去，说一句' }],
+                  mall: [
+                          { label: '逛逛', prompt: '她在商场橱窗前停下来，你说一句' },
+                          { label: '🛍️ 逛商场', special: 'shop' },
+                          { label: '帮我提包', prompt: '她把袋子塞给你，你接过来，说一句' },
+                        ],
+                  supermarket: [
+                          { label: '推车', prompt: '你接过了超市的购物车，说一句' },
+                          { label: '🛒 采购', special: 'supermarket' },
+                          { label: '挑东西', prompt: '她拿起什么东西在研究，你凑过去，说一句' },
+                        ],
                   seaside:     [{ label: '吹风', prompt: '海边的风把她头发吹乱了，你看着，说一句' }, { label: '捡贝壳', prompt: '她蹲下来捡贝壳，你站在旁边，说一句' }],
                   cafe:        [{ label: '点单', prompt: '服务员来了，她在想点什么，你替她说了一句' }, { label: '发呆', prompt: '咖啡馆里很安静，你们都有点发呆，你先开口' }],
                 }
                 const acts = outsideActions[outsidePlace] || []
-                return acts.map(a => (
-                  <button
-                    key={a.label}
-                    onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
-                    style={{
-                      flexShrink: 0, padding: '6px 14px',
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(201,169,110,0.12)',
-                      borderRadius: '20px', color: 'rgba(201,169,110,0.55)',
-                      fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',isolation: 'isolate',
-                      fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
-                    }}
-                  >{a.label}</button>
-                ))
+                return acts.map(a => {
+  if (a.special === 'shop') {
+    return (
+      <button key="shop" onClick={() => setShowShop(true)} style={{
+        flexShrink: 0, padding: '6px 14px',
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(201,169,110,0.12)',
+        borderRadius: '20px', color: 'rgba(201,169,110,0.55)',
+        fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)', isolation: 'isolate',
+        fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
+      }}>🛍️ 逛商场</button>
+    )
+  }
+  if (a.special === 'supermarket') {
+    return (
+      <button key="supermarket" onClick={() => setShowSupermarket(true)} style={{
+        flexShrink: 0, padding: '6px 14px',
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(201,169,110,0.12)',
+        borderRadius: '20px', color: 'rgba(201,169,110,0.55)',
+        fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)', isolation: 'isolate',
+        fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
+      }}>🛒 采购</button>
+    )
+  }
+  return (
+    <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)} style={{
+      flexShrink: 0, padding: '6px 14px',
+      background: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(201,169,110,0.12)',
+      borderRadius: '20px', color: 'rgba(201,169,110,0.55)',
+      fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)', isolation: 'isolate',
+      fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
+    }}>{a.label}</button>
+  )
+})
               })()}
             </div>
 
@@ -2071,6 +2145,293 @@ async function writeDiary() {
               )
             })}
           </div>
+        </>
+      )}
+    </div>
+  </div>
+)}
+
+{/* 超市弹窗 */}
+{showSupermarket && (() => {
+  const categories = [
+    { id: 'staple', label: '🍚 主食', items: SUPERMARKET_ITEMS.filter(i => i.category === 'staple') },
+    { id: 'meat', label: '🥩 肉类', items: SUPERMARKET_ITEMS.filter(i => i.category === 'meat') },
+    { id: 'veggie', label: '🥬 蔬菜', items: SUPERMARKET_ITEMS.filter(i => i.category === 'veggie') },
+    { id: 'snack', label: '🍫 零食', items: SUPERMARKET_ITEMS.filter(i => i.category === 'snack') },
+    { id: 'pet', label: '🐾 宠物', items: SUPERMARKET_ITEMS.filter(i => i.category === 'pet') },
+    { id: 'life', label: '🩹 生活', items: SUPERMARKET_ITEMS.filter(i => i.category === 'life') },
+  ]
+  const [superTab, setSuperTab] = useState('staple')
+  const currentCat = categories.find(c => c.id === superTab)
+  
+  const getCartQty = (id) => cart.find(c => c.id === id)?.qty || 0
+  const addToCart = (item) => {
+    const existing = cart.find(c => c.id === item.id)
+    if (existing) {
+      setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c))
+    } else {
+      setCart([...cart, { id: item.id, name: item.name, price: item.price, qty: 1 }])
+    }
+  }
+  const removeFromCart = (id) => {
+    const existing = cart.find(c => c.id === id)
+    if (existing.qty === 1) {
+      setCart(cart.filter(c => c.id !== id))
+    } else {
+      setCart(cart.map(c => c.id === id ? { ...c, qty: c.qty - 1 } : c))
+    }
+  }
+  const totalPrice = cart.reduce((sum, c) => sum + c.price * c.qty, 0)
+  
+  const handleCheckout = () => {
+    if (totalPrice > coins) { setToast('金币不足'); return }
+    setCoins(prev => prev - totalPrice)
+    // 更新冰箱
+    setFridge(prev => {
+      const next = { ...prev }
+      cart.forEach(c => {
+        const item = SUPERMARKET_ITEMS.find(i => i.id === c.id)
+        if (item) {
+          const fridgeKey = {
+            rice: '米', noodle: '面条', egg: '鸡蛋', milk: '牛奶',
+            chicken: '鸡肉', pork: '猪肉', fish: '鱼', shrimp: '虾',
+            tomato: '番茄', lettuce: '青菜', potato: '土豆', mushroom: '蘑菇',
+            soy: '酱油', butter: '黄油', choco: '巧克力', cake: '蛋糕',
+            catfood: '猫粮', dogfood: '狗粮', pads: '卫生巾',
+          }[item.id] || item.name
+          next[fridgeKey] = (next[fridgeKey] || 0) + c.qty
+        }
+      })
+      return next
+    })
+    setCart([])
+    setShowSupermarket(false)
+    setToast('采购完成！')
+    sendToAI('她去超市采购回来，说一句', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+    saveToDb(messages, intimacy, playerRoom, luRoom)
+  }
+  
+  return (
+    <div onClick={() => setShowSupermarket(false)} style={{
+      position: 'fixed', inset: 0, zIndex: 250,
+      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: '480px',
+        background: 'rgba(10,7,4,0.97)',
+        border: '1px solid rgba(201,169,110,0.12)',
+        borderRadius: '20px 20px 0 0',
+        padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>🛒 超市</div>
+          <div style={{ fontSize: '14px', color: '#ffd966' }}>💰 {coins}</div>
+        </div>
+
+        {/* 分类Tab */}
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {categories.map(cat => (
+            <button key={cat.id} onClick={() => setSuperTab(cat.id)} style={{
+              background: 'none', border: 'none',
+              padding: '5px 12px', borderRadius: '20px', whiteSpace: 'nowrap',
+              color: superTab === cat.id ? '#c9a96e' : 'rgba(255,255,255,0.3)',
+              fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia, serif',
+            }}>
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 商品列表 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+          {currentCat?.items.map(item => {
+            const qty = getCartQty(item.id)
+            return (
+              <div key={item.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '10px 12px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(201,169,110,0.08)',
+                borderRadius: '12px',
+              }}>
+                <div>
+                  <div style={{ fontSize: '13px', color: 'rgba(201,169,110,0.8)' }}>{item.emoji} {item.name}</div>
+                  <div style={{ fontSize: '10px', color: '#ffd966' }}>💰{item.price}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {qty > 0 && <button onClick={() => removeFromCart(item.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '18px', cursor: 'pointer' }}>-</button>}
+                  {qty > 0 && <span style={{ fontSize: '14px', color: '#c9a96e' }}>{qty}</span>}
+                  <button onClick={() => addToCart(item)} style={{ background: 'none', border: 'none', color: '#c9a96e', fontSize: '18px', cursor: 'pointer' }}>+</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* 购物车 */}
+        {cart.length > 0 && (
+          <div style={{
+            borderTop: '1px solid rgba(201,169,110,0.1)',
+            paddingTop: '12px', marginTop: '4px',
+          }}>
+            <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>购物车</div>
+            {cart.map(c => (
+              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>
+                <span>{c.name} x{c.qty}</span>
+                <span>💰{c.price * c.qty}</span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+              <span style={{ fontSize: '12px', color: '#c9a96e' }}>总计: 💰{totalPrice}</span>
+              <button onClick={handleCheckout} style={{
+                padding: '6px 20px', background: 'rgba(201,169,110,0.15)',
+                border: '1px solid rgba(201,169,110,0.3)', borderRadius: '20px',
+                color: '#c9a96e', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif',
+              }}>结算</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+})()}
+
+{/* 宠物面板 */}
+{showPetPanel && (
+  <div onClick={() => { setShowPetPanel(false); setShowAdopt(false) }} style={{
+    position: 'fixed', inset: 0, zIndex: 250,
+    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+  }}>
+    <div onClick={e => e.stopPropagation()} style={{
+      width: '100%', maxWidth: '480px',
+      background: 'rgba(10,7,4,0.97)',
+      border: '1px solid rgba(201,169,110,0.12)',
+      borderRadius: '20px 20px 0 0',
+      padding: '20px 20px 44px',
+    }}>
+      {!pet ? (
+        // 领养界面
+        <>
+          <div style={{ fontSize: '13px', color: '#c9a96e', marginBottom: '14px', textAlign: 'center' }}>🐾 领养宠物</div>
+          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginBottom: '20px' }}>
+            {PETS.map(p => (
+              <button key={p.id} onClick={() => setAdoptingType(p.id)} style={{
+                background: 'rgba(201,169,110,0.08)',
+                border: adoptingType === p.id ? '1px solid #c9a96e' : '1px solid rgba(201,169,110,0.2)',
+                borderRadius: '16px', padding: '16px', cursor: 'pointer', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: '48px' }}>{p.emoji}</div>
+                <div style={{ fontSize: '14px', color: '#c9a96e', marginTop: '8px' }}>{p.name}</div>
+              </button>
+            ))}
+          </div>
+          {adoptingType && (
+            <>
+              <input
+                value={petNameInput}
+                onChange={e => setPetNameInput(e.target.value)}
+                placeholder="给宠物起个名字"
+                style={{
+                  width: '100%', padding: '10px 14px', marginBottom: '12px',
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(201,169,110,0.15)',
+                  borderRadius: '12px', color: '#e8dcc8', fontSize: '13px', outline: 'none',
+                  fontFamily: 'Georgia, serif',
+                }}
+              />
+              <button onClick={() => {
+                const newPet = createPet(adoptingType, petNameInput || (adoptingType === 'cat' ? '咪咪' : '旺财'))
+                setPet(newPet)
+                setShowPetPanel(false)
+                setAdoptingType(null)
+                setPetNameInput('')
+                sendToAI(`她带回了一只${newPet.name}，你的反应，一句话`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                saveToDb(messages, intimacy, playerRoom, luRoom)
+              }} style={{
+                width: '100%', padding: '12px',
+                background: 'rgba(201,169,110,0.12)', border: '1px solid rgba(201,169,110,0.25)',
+                borderRadius: '12px', color: '#c9a96e', fontSize: '13px', cursor: 'pointer',
+                fontFamily: 'Georgia, serif',
+              }}>确认领养</button>
+            </>
+          )}
+        </>
+      ) : (
+        // 宠物管理界面
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ fontSize: '24px' }}>{PETS.find(p => p.id === pet.typeId)?.emoji}</div>
+            <div style={{ fontSize: '16px', color: '#c9a96e' }}>{pet.name}</div>
+            <button onClick={() => setShowPetPanel(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+          </div>
+          
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '4px' }}>饥饿</div>
+            <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pet.hunger}%`, background: pet.hunger < 30 ? '#e08030' : '#c9a96e', borderRadius: '4px' }} />
+            </div>
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '4px' }}>清洁</div>
+            <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pet.clean}%`, background: pet.clean < 30 ? '#e08030' : '#c9a96e', borderRadius: '4px' }} />
+            </div>
+          </div>
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '4px' }}>心情</div>
+            <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pet.mood}%`, background: pet.mood < 30 ? '#e08030' : '#c9a96e', borderRadius: '4px' }} />
+            </div>
+          </div>
+
+          {pet.sick && <div style={{ fontSize: '11px', color: '#e08030', marginBottom: '12px', textAlign: 'center' }}>🤒 它生病了，需要照顾！</div>}
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+            <button onClick={() => {
+              const foodId = pet.typeId === 'cat' ? 'catfood' : 'dogfood'
+              const foodName = pet.typeId === 'cat' ? '猫粮' : '狗粮'
+              if ((fridge[foodName] || 0) <= 0) { setToast(`${foodName}不足`); return }
+              setFridge(prev => ({ ...prev, [foodName]: Math.max(0, (prev[foodName] || 0) - 1) }))
+              setPet(feedPet(pet))
+              setToast(`喂了${pet.name}`)
+              saveToDb(messages, intimacy, playerRoom, luRoom)
+            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer' }}>
+              🍖 喂食
+            </button>
+            <button onClick={() => {
+              setPet(bathePet(pet))
+              setToast(`给${pet.name}洗了澡`)
+              saveToDb(messages, intimacy, playerRoom, luRoom)
+            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer' }}>
+              🧼 洗澡
+            </button>
+            <button onClick={() => {
+              setPet(strokePet(pet))
+              setToast(`撸了${pet.name}`)
+              sendToAI(`她摸了摸${pet.name}，你的反应，一句话`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+              saveToDb(messages, intimacy, playerRoom, luRoom)
+            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer' }}>
+              🫳 撸它
+            </button>
+            <button onClick={() => {
+              sendToAI(`她叫${pet.name}过来，他的反应`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer' }}>
+              🗣️ 叫他过来
+            </button>
+          </div>
+
+          <button onClick={() => {
+            setPet(null)
+            setShowPetPanel(false)
+            sendToAI('她决定把宠物送走，他的反应，一句话', messages, intimacy, playerRoom, luRoom, false, undefined, true)
+            saveToDb(messages, intimacy, playerRoom, luRoom)
+          }} style={{
+            width: '100%', padding: '10px', marginTop: '8px',
+            background: 'none', border: '1px solid rgba(255,100,100,0.2)',
+            borderRadius: '10px', color: 'rgba(255,100,100,0.5)', fontSize: '12px', cursor: 'pointer',
+            fontFamily: 'Georgia, serif',
+          }}>送走</button>
         </>
       )}
     </div>
