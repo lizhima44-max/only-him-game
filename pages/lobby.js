@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/router'
+import { loadApiConfig } from '../lib/apiClient'
+import SettingsPanel from '../components/SettingsPanel'
 
 const CHARACTERS = [
   {
@@ -58,6 +60,7 @@ export default function Lobby() {
   const [activeIdx, setActiveIdx] = useState(1)
   const [showModal, setShowModal] = useState(false)
   const [selectedChar, setSelectedChar] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
   const animRef = useRef(null)
 
   useEffect(() => {
@@ -93,6 +96,13 @@ export default function Lobby() {
   }
 
   async function handleEnter() {
+    // 检查有没有配置API Key
+    const cfg = loadApiConfig()
+    if (!cfg?.apiKey) {
+      setShowModal(false)
+      setShowSettings(true)
+      return
+    }
     if (selectedChar?.theme) {
       localStorage.setItem('selectedCharId', selectedChar.id)
       localStorage.setItem('selectedCharTheme', JSON.stringify(selectedChar.theme))
@@ -141,8 +151,18 @@ export default function Lobby() {
             position: 'relative', zIndex: 10, height: '100%',
             display: 'flex', flexDirection: 'column',
           }}>
-            {/* 顶部标题 - 去掉呼吸效果 */}
-            <div style={{ textAlign: 'center', padding: '32px 20px 8px', flexShrink: 0 }}>
+            {/* 顶部标题 */}
+            <div style={{ textAlign: 'center', padding: '32px 20px 8px', flexShrink: 0, position: 'relative' }}>
+              {/* 设置按钮 - 右上角 */}
+              <button onClick={() => setShowSettings(true)} style={{
+                position: 'absolute', top: '16px', right: '16px',
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '50%', width: '32px', height: '32px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', fontSize: '14px', color: 'rgba(200,220,255,0.5)',
+                backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                transition: 'all 0.25s',
+              }}>⚙</button>
               <div style={{
                 fontSize: '12px', color: 'rgba(220,235,255,0.75)',
                 letterSpacing: '0.45em', marginBottom: '12px',
@@ -480,6 +500,23 @@ export default function Lobby() {
           )}
 
         </div>
+
+        {/* 设置面板 */}
+        <SettingsPanel
+          show={showSettings}
+          onClose={() => {
+            setShowSettings(false)
+            // 如果是从"呼唤他"触发的，关闭后检查key，有就直接进
+            const cfg = loadApiConfig()
+            if (cfg?.apiKey && selectedChar) {
+              if (selectedChar.theme) {
+                localStorage.setItem('selectedCharId', selectedChar.id)
+                localStorage.setItem('selectedCharTheme', JSON.stringify(selectedChar.theme))
+              }
+              router.push('/game')
+            }
+          }}
+        />
       </div>
     </>
   )
