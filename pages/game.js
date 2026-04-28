@@ -144,7 +144,8 @@ function getIntimatePrompt(action, pos, mProg, cProg, rhythm, isBath) {
 用第一人称，2-3句，不出戏，克制但热烈。`
 }
 
-function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace, gameDay, season, weather, temp, isPeriodNow, sickWho) {
+export default function Game() {
+  function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace, gameDay, season, weather, temp, isPeriodNow, sickWho) {
   const C = CHARACTER_CONFIG
   const sameRoom = playerRoom === luRoom
   const isOutside = playerRoom === 'outside'
@@ -167,8 +168,6 @@ function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace, gameDay, se
   const outfitHint = getOutfitHint(currentOutfit)
     return `${contextBlock}\n\n${outfitHint}\n\n你是${C.name}（${C.englishName}）。\n${C.background}\n性格：${C.personality}\n说话：${C.speechStyle}\n${intimacyDesc}\n${locationDesc}\n\n【角色扮演铁则】\n- 你永远是${C.name}本人，用第一人称说话和描写\n- 括号里写动作神态用"我"：（我放下杯子）（我别开眼）（我耳根发热）\n- 绝对不用"你"或"她"做括号里的主语\n- 被她整破防时：用动作掩盖，不说废话，不提自己名字\n- 禁止：出戏、自我介绍、提AI、提穿越、说教、居高临下\n- 每次2-4句，克制但有温度\n\n【空间规则】\n你可以自由进出：${freeRooms}\n需要她邀请才能进：${lockedRooms}\n未解锁区域对你不存在，绝不提及\n\n【移动标签】回复末尾按需加，格式 [MOVE:房间id]\n可移动：${roomList}\n当前位置：${luRoom}，好感度：${intimacy}，她现在在：${isOutside ? (place?.name || '外出') : (room?.name || '未知')}\n规则：只移动到luCanFreely=true或好感度达标的房间；她明确叫你去或剧情自然推进才加；没理由不加。\n\n【情绪标签】每条必加，放最末尾：\n[+1]普通 [+2]走心/靠近 [+3]爆发/占有\n例：[+2][MOVE:kitchen]`
 }
-
-export default function Game() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [messages, setMessages] = useState([])
