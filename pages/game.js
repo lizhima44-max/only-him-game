@@ -3,7 +3,7 @@
    import { useRouter } from 'next/router'
    import { callAI, callFallback, loadApiConfig } from '../lib/apiClient'
    import SettingsPanel from '../components/SettingsPanel'
-   import { processNewDay, getContextPrompt, gameDate, gameDateStr, getWeatherInfo, getSeasonInfo, togglePeriodDay, getCalendarData, predictNextPeriod, checkIsPeriod } from '../lib/gameSystems'
+   import { processNewDay, getContextPrompt, gameDate, realDateStr, getWeatherInfo, getSeasonInfo, togglePeriodDay, getCalendarData, predictNextPeriod, checkIsPeriod } from '../lib/gameSystems'
    import { ALL_OUTFITS, getOwnedOutfits, getOutfitHint,
          ALL_BEDSIDE_ITEMS, getOwnedBedsideItems } from '../lib/wardrobeItems'
    import { SUPERMARKET_ITEMS, SHOP_CATEGORIES, HER_OUTFITS, GIFTS, getShopItems,
@@ -770,7 +770,7 @@ setCoins(prev => prev + 50)
     const newDays = togglePeriodDay(periodDays, year, month, day)
     setPeriodDays(newDays)
     // 重新检查当前是否经期
-    const gd = gameDate(gameDay || 1)
+    const gd = realDate()
     const ip = checkIsPeriod(newDays, gd)
     setIsPeriodNow(ip)
     // 立即存档
@@ -1965,7 +1965,7 @@ setCoins(prev => prev + 50)
       )}
 {/* ══ 日历弹窗 ══ */}
         {showCalendar && (() => {
-    const gd = gameDay > 0 ? gameDate(gameDay) : { y: new Date().getFullYear(), m: new Date().getMonth()+1, d: new Date().getDate() }
+    const gd = realDate()
     const calData = getCalendarData(calYear, calMonth, periodDays, gd)
     const predicted = predictNextPeriod(periodDays)
     const calNavBtn = { background: 'none', border: '1px solid rgba(201,169,110,0.15)', color: 'rgba(201,169,110,0.5)', padding: '4px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'Georgia, serif' }
