@@ -1,6 +1,8 @@
-import { useEffect, useState, useRef } from 'react'
-import { supabase } from '../lib/supabase'
-import { useRouter } from 'next/router'
+   import { useEffect, useState, useRef } from 'react'
+   import { supabase } from '../lib/supabase'
+   import { useRouter } from 'next/router'
+   import { callAI, callFallback, loadApiConfig } from '../lib/apiClient'
+   import SettingsPanel from '../components/SettingsPanel'
 
 const ROOMS = [
   { id: 'living_room', name: '客厅',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
@@ -222,6 +224,7 @@ export default function Game() {
   const [candleLit, setCandleLit] = useState(false)    // 蜡烛是否点燃
   // ── 上下文摘要 ──
   const [memoryBlock, setMemoryBlock] = useState('')   // 压缩后的记忆块
+  const [showSettings, setShowSettings] = useState(false)
   const aiTimerRef = useRef(null)
 
   useEffect(() => {
@@ -240,6 +243,7 @@ export default function Game() {
         setMessages(data.chat_history)
         setRomantic(data.romantic || 0)
         setTotalWk(data.total_wk || 0)
+        setMemoryBlock(data.memory_summary || '')  // ← 新增：读取记忆
         setInitialized(true)
       } else {
         await supabase.from('game_saves').upsert(
@@ -291,84 +295,80 @@ export default function Game() {
       lu_location: lRoom,
       romantic: rom ?? romantic,
       total_wk: wk ?? totalWk,
+      memory_summary: memoryBlock,        // ← 新增
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
   }
 
-  async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit = false, uid, isSystem = false) {
-    setLoading(true)
-    // 把记忆块注入到系统提示里
-    const basePrompt = getSystemPrompt(curIntimacy, pRoom, lRoom, outsidePlace)
-    const systemPrompt = memoryBlock
-      ? `${basePrompt}\n\n【过往记忆摘要】\n${memoryBlock}`
-      : basePrompt
-    const msgsToSend = isInit
-      ? [{ role: 'user', content: userText }]
-      : [...currentMsgs, { role: 'user', content: userText }]
-    let rawReply = ''
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ systemPrompt, messages: msgsToSend }),
+
+async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit = false, uid, isSystem = false) {
+  setLoading(true)
+  const basePrompt = getSystemPrompt(curIntimacy, pRoom, lRoom, outsidePlace)
+  const systemPrompt = memoryBlock
+    ? `${basePrompt}\n\n【过往记忆摘要】\n${memoryBlock}`
+    : basePrompt
+  const msgsToSend = isInit
+    ? [{ role: 'user', content: userText }]
+    : [...currentMsgs, { role: 'user', content: userText }]
+  let rawReply = ''
+  try {
+    // 读取用户API配置，有则直连，无则走服务端代理
+    const apiConfig = loadApiConfig()
+    if (apiConfig?.apiKey) {
+      rawReply = await callAI(systemPrompt, msgsToSend, apiConfig)
+    } else {
+      rawReply = await callFallback(systemPrompt, msgsToSend)
+    }
+
+    const tagMatch = rawReply.match(/\[(\+\d)\]/)
+    const scoreTag = tagMatch ? parseInt(tagMatch[1]) : 1
+    const moveMatch = rawReply.match(/\[MOVE:([a-z_]+)\]/)
+    const moveTarget = moveMatch ? moveMatch[1] : null
+    const reply = rawReply
+      .replace(/\s*\[\+\d\]\s*/g, '')
+      .replace(/\s*\[MOVE:[a-z_]+\]\s*/g, '')
+      .trim()
+
+    const newIntimacy = Math.min(100, curIntimacy + scoreTag)
+    let newMsgs = isInit || isSystem
+      ? [...currentMsgs, { role: 'assistant', content: reply }]
+      : [...currentMsgs, { role: 'user', content: userText }, { role: 'assistant', content: reply }]
+
+    const shouldDiary = (scoreTag >= 2 && Math.random() < 0.35) ||
+                        (isSystem && userText.includes('结束') && Math.random() < 0.7)
+    if (shouldDiary) writeDiary()
+
+    if (newMsgs.length >= 24) {
+      maybeSummarize(newMsgs).then(compressed => {
+        setMessages(compressed)
+        saveToDb(compressed, newIntimacy, pRoom, lRoom, uid || userId)
       })
-      const data = await res.json()
-      rawReply = data.choices?.[0]?.message?.content || '···'
+    } else {
+      setMessages(newMsgs)
+    }
+    setIntimacy(newIntimacy)
 
-      const tagMatch = rawReply.match(/\[(\+\d)\]/)
-      const scoreTag = tagMatch ? parseInt(tagMatch[1]) : 1
-      const moveMatch = rawReply.match(/\[MOVE:([a-z_]+)\]/)
-      const moveTarget = moveMatch ? moveMatch[1] : null
-      const reply = rawReply
-        .replace(/\s*\[\+\d\]\s*/g, '')
-        .replace(/\s*\[MOVE:[a-z_]+\]\s*/g, '')
-        .trim()
-
-      const newIntimacy = Math.min(100, curIntimacy + scoreTag)
-      let newMsgs = isInit || isSystem
-        ? [...currentMsgs, { role: 'assistant', content: reply }]
-        : [...currentMsgs, { role: 'user', content: userText }, { role: 'assistant', content: reply }]
-
-      // 日记自动触发：情绪+2/+3，或结束亲密（isSystem且包含"结束"），有概率静默写
-      const shouldDiary = (scoreTag >= 2 && Math.random() < 0.35) ||
-                          (isSystem && userText.includes('结束') && Math.random() < 0.7)
-      if (shouldDiary) {
-        writeDiary()  // 静默，玩家无感
-      }
-
-      // 超过24条时触发压缩（异步，不阻塞渲染）
-      if (newMsgs.length >= 24) {
-        maybeSummarize(newMsgs).then(compressed => {
-          setMessages(compressed)
-          saveToDb(compressed, newIntimacy, pRoom, lRoom, uid || userId)
-        })
-      } else {
-        setMessages(newMsgs)
-      }
-      setIntimacy(newIntimacy)
-
-      if (moveTarget && moveTarget !== lRoom) {
-        const targetRoom = ROOMS.find(r => r.id === moveTarget)
-        const canMove = targetRoom && (targetRoom.luCanFreely || newIntimacy >= (targetRoom.unlockAt || 0))
-        if (canMove) {
-          setLuMoving(true)
-          // 修复：直接setLuRoom而不依赖异步，确保人真的过来
-          setLuRoom(moveTarget)
-          setTimeout(() => {
-            setLuMoving(false)
-            setToast(`· 他去了${targetRoom.name}`)
-          }, 700)
-          saveToDb(newMsgs, newIntimacy, pRoom, moveTarget, uid || userId)
-        } else {
-          await saveToDb(newMsgs, newIntimacy, pRoom, lRoom, uid)
-        }
+    if (moveTarget && moveTarget !== lRoom) {
+      const targetRoom = ROOMS.find(r => r.id === moveTarget)
+      const canMove = targetRoom && (targetRoom.luCanFreely || newIntimacy >= (targetRoom.unlockAt || 0))
+      if (canMove) {
+        setLuMoving(true)
+        setLuRoom(moveTarget)
+        setTimeout(() => { setLuMoving(false); setToast(`· 他去了${targetRoom.name}`) }, 700)
+        saveToDb(newMsgs, newIntimacy, pRoom, moveTarget, uid || userId)
       } else {
         await saveToDb(newMsgs, newIntimacy, pRoom, lRoom, uid)
       }
-    } catch (e) { console.error(e) }
-    setLoading(false)
-    return rawReply || ''
+    } else {
+      await saveToDb(newMsgs, newIntimacy, pRoom, lRoom, uid)
+    }
+  } catch (e) {
+    console.error(e)
+    setToast(e.message || 'AI回复失败')
   }
+  setLoading(false)
+  return rawReply || ''
+}
 
   function handleSend() {
     if (!input.trim() || loading) return
@@ -470,25 +470,21 @@ export default function Game() {
     )
   }
 
-  async function sendIntimAI(action, pos, mp, cp, rh, isBath) {
-    const prompt = getIntimatePrompt(action, pos, mp, cp, rh, isBath)
-    const C = CHARACTER_CONFIG
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemPrompt: `你是${C.name}，用第一人称，不出戏，简短热烈。`,
-          messages: [{ role: 'user', content: prompt }],
-          tier: 'premium',
-        }),
-      })
-      const data = await res.json()
-      const reply = data.choices?.[0]?.message?.content || '···'
-      // 动作标签 + 回复合并成一条，斜体格式由渲染层处理
-      setMessages(prev => [...prev, { role: 'assistant', content: action.label + '\n' + reply, intimate: true }])
-    } catch (e) { console.error(e) }
-  }
+async function sendIntimAI(action, pos, mp, cp, rh, isBath) {
+  const prompt = getIntimatePrompt(action, pos, mp, cp, rh, isBath)
+  const C = CHARACTER_CONFIG
+  try {
+    const apiConfig = loadApiConfig()
+    const sysPrompt = `你是${C.name}，用第一人称，不出戏，简短热烈。`
+    let reply
+    if (apiConfig?.apiKey) {
+      reply = await callAI(sysPrompt, [{ role: 'user', content: prompt }], apiConfig)
+    } else {
+      reply = await callFallback(sysPrompt, [{ role: 'user', content: prompt }])
+    }
+    setMessages(prev => [...prev, { role: 'assistant', content: action.label + '\n' + reply, intimate: true }])
+  } catch (e) { console.error(e) }
+}
 
   function doPlayerAction() {
     if (isAiTurn) { setToast('等他先动…'); return }
@@ -566,46 +562,52 @@ export default function Game() {
   }
 
   // ── 上下文压缩：超过20条时总结前半段 ──
-  async function maybeSummarize(msgs) {
-    if (msgs.length < 24) return msgs
-    const toCompress = msgs.slice(0, msgs.length - 10)
-    const recent = msgs.slice(msgs.length - 10)
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemPrompt: '你是一个记忆助手，用中文提炼对话摘要。输出两部分：【重要】列出角色关系进展、重要事件、已达成的状态（各一句）；【细节】列出有趣细节、她的喜好、他说过的话（各一句）。总共不超过150字。',
-          messages: [{ role: 'user', content: '请总结以下对话：\n' + toCompress.map(m => `${m.role === 'user' ? '她' : '他'}：${m.content}`).join('\n') }],
-        }),
-      })
-      const data = await res.json()
-      const summary = data.choices?.[0]?.message?.content || ''
-      if (summary) {
-        setMemoryBlock(prev => (prev ? prev + '\n---\n' : '') + summary)
-        return recent
+async function maybeSummarize(msgs) {
+  if (msgs.length < 24) return msgs
+  const toCompress = msgs.slice(0, msgs.length - 10)
+  const recent = msgs.slice(msgs.length - 10)
+  try {
+    const apiConfig = loadApiConfig()
+    const sysPrompt = '你是一个记忆助手，用中文提炼对话摘要。输出两部分：【重要】列出角色关系进展、重要事件、已达成的状态（各一句）；【细节】列出有趣细节、她的喜好、他说过的话（各一句）。总共不超过150字。'
+    const userMsg = [{ role: 'user', content: '请总结以下对话：\n' + toCompress.map(m => `${m.role === 'user' ? '她' : '他'}：${m.content}`).join('\n') }]
+    let summary
+    if (apiConfig?.apiKey) {
+      summary = await callAI(sysPrompt, userMsg, apiConfig)
+    } else {
+      summary = await callFallback(sysPrompt, userMsg)
+    }
+    if (summary) {
+      const newMemory = (memoryBlock ? memoryBlock + '\n---\n' : '') + summary
+      setMemoryBlock(newMemory)
+      // 持久化记忆到数据库
+      if (userId) {
+        await supabase.from('game_saves').update({
+          memory_summary: newMemory,
+        }).eq('user_id', userId)
       }
-    } catch (e) { console.error(e) }
-    return msgs
-  }
+      return recent
+    }
+  } catch (e) { console.error(e) }
+  return msgs
+}
 
   // ── 写日记 ──
-  async function writeDiary() {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemPrompt: CHARACTER_CONFIG.diaryPrompt.replace('{name}', CHARACTER_CONFIG.name),
-        messages: [{ role: 'user', content: '写今天的日记' }],
-      }),
-    })
-    const data = await res.json()
-    const entry = data.choices?.[0]?.message?.content || ''
+async function writeDiary() {
+  try {
+    const apiConfig = loadApiConfig()
+    const sysPrompt = CHARACTER_CONFIG.diaryPrompt.replace('{name}', CHARACTER_CONFIG.name)
+    let entry
+    if (apiConfig?.apiKey) {
+      entry = await callAI(sysPrompt, [{ role: 'user', content: '写今天的日记' }], apiConfig)
+    } else {
+      entry = await callFallback(sysPrompt, [{ role: 'user', content: '写今天的日记' }])
+    }
     if (entry) {
       const date = new Date().toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
       setDiaryList(prev => [...prev, { date, content: entry }])
     }
-  }
+  } catch (e) { console.error(e) }
+}
 
   const sameRoom = playerRoom === luRoom
   const isOutside = playerRoom === 'outside'
@@ -747,6 +749,11 @@ export default function Game() {
                   borderRadius: '20px', cursor: 'pointer', letterSpacing: '0.05em',
                 }}>叫他过来</button>
               )}
+              <button onClick={() => setShowSettings(true)} style={{
+                     fontSize: '9px', background: 'none', border: '1px solid rgba(201,169,110,0.15)',
+                     color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
+                     letterSpacing: '0.05em', padding: '3px 8px', borderRadius: '12px',
+              }}>⚙</button>
               <button onClick={async () => {
                 await supabase.auth.signOut()
                 router.push('/')
@@ -794,7 +801,7 @@ export default function Game() {
                   padding: '9px 13px', fontSize: isIntimate ? '13px' : '14px', lineHeight: '1.8',
                   color: m.role === 'user' ? '#a0c0b0' : '#e8dcc8',
                   fontStyle: isIntimate ? 'italic' : 'normal',
-                  backdropFilter: 'blur(10px)',
+                  backdropFilter: 'blur(10px)',isolation: 'isolate'
                 }}>
                   {isIntimate ? (
                     <>
@@ -886,7 +893,7 @@ export default function Game() {
                   background: expandedAction === 'niwai' ? 'rgba(201,169,110,0.2)' : 'rgba(255,255,255,0.06)',
                   border: `1px solid ${expandedAction === 'niwai' ? 'rgba(201,169,110,0.4)' : 'rgba(201,169,110,0.12)'}`,
                   borderRadius: '20px', color: expandedAction === 'niwai' ? '#c9a96e' : 'rgba(201,169,110,0.55)',
-                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',isolation: 'isolate',
                   fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
                   transition: 'all 0.2s',
                 }}
@@ -900,7 +907,7 @@ export default function Game() {
                   background: expandedAction === 'prank' ? 'rgba(201,169,110,0.2)' : 'rgba(255,255,255,0.06)',
                   border: `1px solid ${expandedAction === 'prank' ? 'rgba(201,169,110,0.4)' : 'rgba(201,169,110,0.12)'}`,
                   borderRadius: '20px', color: expandedAction === 'prank' ? '#c9a96e' : 'rgba(201,169,110,0.55)',
-                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',isolation: 'isolate',
                   fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
                   transition: 'all 0.2s',
                 }}
@@ -947,7 +954,7 @@ export default function Game() {
                   border: `1px solid ${active ? 'rgba(201,169,110,0.4)' : 'rgba(201,169,110,0.12)'}`,
                   borderRadius: '20px',
                   color: active ? '#c9a96e' : 'rgba(201,169,110,0.55)',
-                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',isolation: 'isolate',
                   fontFamily: 'Georgia, serif', letterSpacing: '0.05em', transition: 'all 0.2s',
                 })
                 return (
@@ -1014,7 +1021,7 @@ export default function Game() {
                       background: 'rgba(255,255,255,0.06)',
                       border: '1px solid rgba(201,169,110,0.12)',
                       borderRadius: '20px', color: 'rgba(201,169,110,0.55)',
-                      fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+                      fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',isolation: 'isolate',
                       fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
                     }}
                   >{a.label}</button>
@@ -1026,7 +1033,7 @@ export default function Game() {
             {expandedAction === 'niwai' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',
+                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
                 border: '1px solid rgba(201,169,110,0.12)',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
@@ -1066,7 +1073,7 @@ export default function Game() {
             {expandedAction === 'prank' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',
+                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
                 border: '1px solid rgba(201,169,110,0.12)',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
@@ -1109,7 +1116,7 @@ export default function Game() {
             {expandedAction === 'bath' && playerRoom === 'bathroom' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',
+                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
                 border: '1px solid rgba(201,169,110,0.12)',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
@@ -1259,7 +1266,7 @@ export default function Game() {
             {expandedAction === 'bedroom_intimate' && playerRoom === 'bedroom' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',
+                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
                 border: '1px solid rgba(201,169,110,0.12)',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
@@ -1450,7 +1457,7 @@ export default function Game() {
                   border: '1px solid rgba(201,169,110,0.12)',
                   borderRadius: '22px', padding: '11px 18px', color: '#e8dcc8',
                   fontSize: '14px', outline: 'none', fontFamily: 'Georgia, serif',
-                  backdropFilter: 'blur(8px)',
+                  backdropFilter: 'blur(8px)',isolation: 'isolate'
                 }}
               />
               <button onClick={handleSend} disabled={loading} style={{
@@ -1470,7 +1477,7 @@ export default function Game() {
       {showKnock && (
         <div onClick={() => setShowKnock(false)} style={{
           position: 'fixed', inset: 0, zIndex: 200,
-          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',isolation: 'isolate',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <div onClick={e => e.stopPropagation()} style={{
@@ -1520,7 +1527,7 @@ export default function Game() {
       {showOutside && (
         <div onClick={() => setShowOutside(false)} style={{
           position: 'fixed', inset: 0, zIndex: 200,
-          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',isolation: 'isolate',
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
         }}>
           <div onClick={e => e.stopPropagation()} style={{
@@ -1555,7 +1562,7 @@ export default function Game() {
       {showAddPrank && (
         <div onClick={() => setShowAddPrank(false)} style={{
           position: 'fixed', inset: 0, zIndex: 250,
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',isolation: 'isolate',
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
         }}>
           <div onClick={e => e.stopPropagation()} style={{
@@ -1611,7 +1618,7 @@ export default function Game() {
         const isCook = showFridge === 'cook'
         const canMake = (recipe) => Object.entries(recipe.need).every(([k, v]) => (fridge[k] || 0) >= v)
         return (
-          <div onClick={() => setShowFridge(false)} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={() => setShowFridge(false)} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', isolation: 'isolate',display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'rgba(10,7,4,0.97)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '70vh', overflowY: 'auto' }}>
               <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', letterSpacing: '0.2em', marginBottom: '14px' }}>{isCook ? '一起做饭 · 选菜谱' : '冰箱 · 食材'}</div>
               {!isCook ? (
@@ -1654,7 +1661,7 @@ export default function Game() {
 
       {/* ══ 看书弹窗 ══ */}
       {showBooks && (
-        <div onClick={() => { setShowBooks(false); setShowAddBook(false) }} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <div onClick={() => { setShowBooks(false); setShowAddBook(false) }} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', isolation: 'isolate',display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'rgba(10,7,4,0.97)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', letterSpacing: '0.2em' }}>书架</div>
@@ -1689,7 +1696,7 @@ export default function Game() {
 
       {/* ══ 日记弹窗 ══ */}
       {showDiary && (
-        <div onClick={() => { setShowDiary(false); setViewingDiary(null) }} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <div onClick={() => { setShowDiary(false); setViewingDiary(null) }} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',isolation: 'isolate', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'rgba(10,7,4,0.97)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto' }}>
             {viewingDiary !== null ? (
               <>
@@ -1719,7 +1726,7 @@ export default function Game() {
           </div>
         </div>
       )}
-
+      <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} />
       {/* Toast */}
       {toast && (
         <div style={{
@@ -1728,7 +1735,7 @@ export default function Game() {
           background: 'rgba(12,8,4,0.94)', border: '1px solid rgba(201,169,110,0.15)',
           color: 'rgba(201,169,110,0.7)', fontSize: '11px', padding: '8px 20px',
           borderRadius: '20px', letterSpacing: '0.1em', zIndex: 300,
-          whiteSpace: 'nowrap', backdropFilter: 'blur(8px)',
+          whiteSpace: 'nowrap', backdropFilter: 'blur(8px)', isolation: 'isolate'
         }}>{toast}</div>
       )}
 
