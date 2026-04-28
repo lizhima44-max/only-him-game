@@ -284,21 +284,35 @@ export default function Game() {
 
   useEffect(() => () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current) }, [])
 
-  async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
-    const id = uid || userId
-    if (!id) return
-    await supabase.from('game_saves').upsert({
-      user_id: id,
-      chat_history: msgs.slice(-30),
-      intimacy: intim,
-      current_room: pRoom,
-      lu_location: lRoom,
-      romantic: rom ?? romantic,
-      total_wk: wk ?? totalWk,
-      memory_summary: memoryBlock,        // ← 新增
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
+async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
+  const id = uid || userId
+  if (!id) { console.warn('[SAVE] 没有 userId，跳过存档'); return }
+  
+  const payload = {
+    user_id: id,
+    chat_history: msgs.slice(-30),
+    intimacy: intim,
+    current_room: pRoom,
+    lu_location: lRoom,
+    romantic: rom ?? romantic,
+    total_wk: wk ?? totalWk,
+    memory_summary: memoryBlock,
+    updated_at: new Date().toISOString(),
   }
+  
+  const { data, error } = await supabase
+    .from('game_saves')
+    .upsert(payload, { onConflict: 'user_id' })
+    .select()  // 加 .select() 让 supabase 返回写入的数据
+  
+  if (error) {
+    console.error('[SAVE] 存档失败:', error.message, error.details, error.hint)
+    // 可以加个 toast 让用户知道
+    // setToast('存档失败: ' + error.message)
+  } else {
+    console.log('[SAVE] 存档成功, intimacy:', intim, 'msgs:', msgs.length)
+  }
+}
 
 
 async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit = false, uid, isSystem = false) {
@@ -338,29 +352,31 @@ async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit
                         (isSystem && userText.includes('结束') && Math.random() < 0.7)
     if (shouldDiary) writeDiary()
 
-    if (newMsgs.length >= 24) {
-      maybeSummarize(newMsgs).then(compressed => {
-        setMessages(compressed)
-        saveToDb(compressed, newIntimacy, pRoom, lRoom, uid || userId)
-      })
-    } else {
-      setMessages(newMsgs)
-    }
+    // 设置好感
     setIntimacy(newIntimacy)
 
+    // 处理MOVE
+    let saveLRoom = lRoom
     if (moveTarget && moveTarget !== lRoom) {
       const targetRoom = ROOMS.find(r => r.id === moveTarget)
       const canMove = targetRoom && (targetRoom.luCanFreely || newIntimacy >= (targetRoom.unlockAt || 0))
       if (canMove) {
         setLuMoving(true)
         setLuRoom(moveTarget)
+        saveLRoom = moveTarget
         setTimeout(() => { setLuMoving(false); setToast(`· 他去了${targetRoom.name}`) }, 700)
-        saveToDb(newMsgs, newIntimacy, pRoom, moveTarget, uid || userId)
-      } else {
-        await saveToDb(newMsgs, newIntimacy, pRoom, lRoom, uid)
       }
+    }
+
+    // 压缩或直接存 — 只走一条路径，不竞态
+    if (newMsgs.length >= 24) {
+      maybeSummarize(newMsgs).then(compressed => {
+        setMessages(compressed)
+        saveToDb(compressed, newIntimacy, pRoom, saveLRoom, uid || userId)
+      })
     } else {
-      await saveToDb(newMsgs, newIntimacy, pRoom, lRoom, uid)
+      setMessages(newMsgs)
+      await saveToDb(newMsgs, newIntimacy, pRoom, saveLRoom, uid || userId)
     }
   } catch (e) {
     console.error(e)
