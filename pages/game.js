@@ -2151,6 +2151,113 @@ setCoins(prev => prev + 50)
     </div>
   </div>
 )}
+{/* 商场弹窗 */}
+{showShop && (() => {
+  const shopItems = getShopItems(wardrobe, bedsideItems, intimacy)
+  console.log('shopItems:', shopItems, 'wardrobe:', wardrobe, 'intimacy:', intimacy)
+  const currentItems = 
+    shopTab === 'his' ? shopItems.hisClothes :
+    shopTab === 'her' ? shopItems.herClothes :
+    shopTab === 'toys' ? shopItems.toys :
+    shopItems.gifts
+  
+  return (
+    <div onClick={() => setShowShop(false)} style={{
+      position: 'fixed', inset: 0, zIndex: 250,
+      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: '480px',
+        background: 'rgba(10,7,4,0.97)',
+        border: '1px solid rgba(201,169,110,0.12)',
+        borderRadius: '20px 20px 0 0',
+        padding: '20px 20px 44px', maxHeight: '70vh', overflowY: 'auto',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>🛍️ 商场</div>
+          <div style={{ fontSize: '14px', color: '#ffd966' }}>💰 {coins}</div>
+        </div>
+
+        {/* Tab栏 */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(201,169,110,0.1)', paddingBottom: '10px' }}>
+          {SHOP_CATEGORIES.map(cat => (
+            <button key={cat.id} onClick={() => setShopTab(cat.id)} style={{
+              background: 'none', border: 'none',
+              padding: '6px 12px', borderRadius: '20px',
+              color: shopTab === cat.id ? '#c9a96e' : 'rgba(255,255,255,0.3)',
+              fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif',
+              borderBottom: shopTab === cat.id ? '1px solid #c9a96e' : 'none',
+            }}>
+              {cat.icon} {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 商品列表 */}
+        {currentItems.length === 0 ? (
+          <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.3)', textAlign: 'center', padding: '40px 0' }}>
+            暂无商品可购买
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {currentItems.map(item => {
+              const isGift = item.shopType === 'gift'
+              const isHerClothes = item.owner === 'her'
+              const canAfford = coins >= item.price
+              return (
+                <button key={item.id} onClick={() => {
+                  if (!canAfford) { setToast('金币不足'); return }
+                  setCoins(prev => prev - item.price)
+                  
+                  if (isGift) {
+                    // 礼物：加好感度
+                    const newIntimacy = Math.min(100, intimacy + (item.intimacyBoost || 0))
+                    setIntimacy(newIntimacy)
+                    sendToAI(`她送了他${item.name}（${item.desc}），他的反应，一句话`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                  } else if (item.shopType === 'wardrobe') {
+                    // 衣物：加入衣帽间
+                    setWardrobe(prev => [...prev, item.id])
+                    if (isHerClothes) {
+                      sendToAI(`她买了一件${item.name}，${item.desc}，他的反应，一句话`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                    } else {
+                      sendToAI(`她买了一件${item.name}（${item.desc}）给他，他还没有换上，一句话评价`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                    }
+                  } else if (item.shopType === 'bedside') {
+                    // 道具：加入床头柜
+                    setBedsideItems(prev => [...prev, item.id])
+                    sendToAI(`她买了${item.name}（${item.desc}），放进床头柜，他的反应，一句话`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                  }
+                  
+                  saveToDb(messages, intimacy, playerRoom, luRoom)
+                  setToast(`购买了 ${item.name}`)
+                }} style={{
+                  padding: '12px 14px', textAlign: 'left',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(201,169,110,0.08)',
+                  borderRadius: '12px', cursor: canAfford ? 'pointer' : 'default',
+                  opacity: canAfford ? 1 : 0.5,
+                  fontFamily: 'Georgia, serif',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', marginBottom: '3px', color: 'rgba(201,169,110,0.8)' }}>{item.name}</div>
+                      <div style={{ fontSize: '10px', opacity: 0.5 }}>{item.desc}</div>
+                      {item.category && <div style={{ fontSize: '9px', color: 'rgba(201,169,110,0.3)', marginTop: '2px' }}>
+                        {item.category === 'daily' ? '常服' : item.category === 'formal' ? '正装' : item.category === 'home' ? '居家' : item.category === 'intimate' ? '💕 情趣' : ''}
+                      </div>}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#ffd966' }}>💰{item.price}</div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+})()}
 
 {/* 超市弹窗 */}
 {showSupermarket && (() => {
