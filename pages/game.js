@@ -4,7 +4,8 @@
    import { callAI, callFallback, loadApiConfig } from '../lib/apiClient'
    import SettingsPanel from '../components/SettingsPanel'
    import { processNewDay, getContextPrompt, gameDate, gameDateStr, getWeatherInfo, getSeasonInfo, togglePeriodDay, getCalendarData, predictNextPeriod, checkIsPeriod } from '../lib/gameSystems'
-   
+   import { ALL_OUTFITS, getOwnedOutfits, getOutfitHint,
+         ALL_BEDSIDE_ITEMS, getOwnedBedsideItems } from '../lib/wardrobeItems'
 
 const ROOMS = [
   { id: 'living_room', name: '客厅',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
@@ -163,8 +164,8 @@ function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace, gameDay, se
   const lockedRooms = ROOMS.filter(r => !r.luCanFreely).map(r => `${r.name}(需好感${r.unlockAt})`).join('、')
   const roomList = ROOMS.map(r => `${r.id}(${r.name},${r.luCanFreely ? '自由进出' : '需好感'+r.unlockAt})`).join('、')
   const contextBlock = getContextPrompt({ day: gameDay, season, weather, temp, isPeriod: isPeriodNow, sickWho })
-
-    return `${contextBlock}\n\n你是${C.name}（${C.englishName}）。\n${C.background}\n性格：${C.personality}\n说话：${C.speechStyle}\n${intimacyDesc}\n${locationDesc}\n\n【角色扮演铁则】\n- 你永远是${C.name}本人，用第一人称说话和描写\n- 括号里写动作神态用"我"：（我放下杯子）（我别开眼）（我耳根发热）\n- 绝对不用"你"或"她"做括号里的主语\n- 被她整破防时：用动作掩盖，不说废话，不提自己名字\n- 禁止：出戏、自我介绍、提AI、提穿越、说教、居高临下\n- 每次2-4句，克制但有温度\n\n【空间规则】\n你可以自由进出：${freeRooms}\n需要她邀请才能进：${lockedRooms}\n未解锁区域对你不存在，绝不提及\n\n【移动标签】回复末尾按需加，格式 [MOVE:房间id]\n可移动：${roomList}\n当前位置：${luRoom}，好感度：${intimacy}，她现在在：${isOutside ? (place?.name || '外出') : (room?.name || '未知')}\n规则：只移动到luCanFreely=true或好感度达标的房间；她明确叫你去或剧情自然推进才加；没理由不加。\n\n【情绪标签】每条必加，放最末尾：\n[+1]普通 [+2]走心/靠近 [+3]爆发/占有\n例：[+2][MOVE:kitchen]`
+  const outfitHint = getOutfitHint(currentOutfit)
+    return `${contextBlock}\n\n${outfitHint}\n\n你是${C.name}（${C.englishName}）。\n${C.background}\n性格：${C.personality}\n说话：${C.speechStyle}\n${intimacyDesc}\n${locationDesc}\n\n【角色扮演铁则】\n- 你永远是${C.name}本人，用第一人称说话和描写\n- 括号里写动作神态用"我"：（我放下杯子）（我别开眼）（我耳根发热）\n- 绝对不用"你"或"她"做括号里的主语\n- 被她整破防时：用动作掩盖，不说废话，不提自己名字\n- 禁止：出戏、自我介绍、提AI、提穿越、说教、居高临下\n- 每次2-4句，克制但有温度\n\n【空间规则】\n你可以自由进出：${freeRooms}\n需要她邀请才能进：${lockedRooms}\n未解锁区域对你不存在，绝不提及\n\n【移动标签】回复末尾按需加，格式 [MOVE:房间id]\n可移动：${roomList}\n当前位置：${luRoom}，好感度：${intimacy}，她现在在：${isOutside ? (place?.name || '外出') : (room?.name || '未知')}\n规则：只移动到luCanFreely=true或好感度达标的房间；她明确叫你去或剧情自然推进才加；没理由不加。\n\n【情绪标签】每条必加，放最末尾：\n[+1]普通 [+2]走心/靠近 [+3]爆发/占有\n例：[+2][MOVE:kitchen]`
 }
 
 export default function Game() {
@@ -247,6 +248,12 @@ const [bookList, setBookList] = useState(defaultBookList)
   const [showCalendar, setShowCalendar] = useState(false)
   const [calYear, setCalYear] = useState(new Date().getFullYear())
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1)
+  // ── 衣帽间/床头柜 ──
+  const [wardrobe, setWardrobe] = useState(['daily_white', 'daily_black'])
+  const [currentOutfit, setCurrentOutfit] = useState('daily_white')
+  const [bedsideItems, setBedsideItems] = useState([])
+  const [showWardrobe, setShowWardrobe] = useState(false)
+  const [showBedside, setShowBedside] = useState(false)
 
   const aiTimerRef = useRef(null)
 
@@ -279,6 +286,9 @@ const [bookList, setBookList] = useState(defaultBookList)
         setBookList(data.book_list?.length > 0 ? data.book_list : defaultBookList)
         setCandleLit(data.candle_lit || false)
         // 其中 defaultFridge 和 defaultBookList 是现有的初始值
+        setWardrobe(data.wardrobe || ['daily_white', 'daily_black'])
+        setCurrentOutfit(data.current_outfit || 'daily_white')
+        setBedsideItems(data.bedside_items || [])
         setInitialized(true)
 
       } else {
@@ -345,6 +355,9 @@ async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
       fridge: fridge,
       book_list: bookList,
       candle_lit: candleLit,
+      wardrobe: wardrobe,
+      current_outfit: currentOutfit,
+      bedside_items: bedsideItems,
       //
     updated_at: new Date().toISOString(),
   }
@@ -1083,10 +1096,11 @@ async function writeDiary() {
                   guest_room: [
                     { label: '坐会儿', prompt: '她进了客房坐下，你坐在对面，说一句' },
                   ],
-                  bathroom: [],
                   bedroom: [
                     { label: '躺一躺', prompt: '她走进卧室躺下，你站在门口，说一句' },
                     { label: '说说话', prompt: '卧室里安静，她想和你说说话，你的反应' },
+                    { label: '衣帽间', special: 'wardrobe' },
+                    { label: '床头柜', special: 'bedside' },
                   ],
                 }
                 const acts = roomActions[playerRoom] || []
@@ -1117,6 +1131,12 @@ async function writeDiary() {
                       )
                       if (a.special === 'diary') return (
                         <button key="diary" onClick={() => setShowDiary(true)} style={btnStyle()}>他的日记</button>
+                      )
+                      if (a.special === 'wardrobe') return (
+                        <button key="wardrobe" onClick={() => setShowWardrobe(true)} style={btnStyle()}>衣帽间</button>
+                      )
+                      if (a.special === 'bedside') return (
+                        <button key="bedside" onClick={() => setShowBedside(true)} style={btnStyle()}>床头柜</button>
                       )
                       return (
                         <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
@@ -1869,7 +1889,7 @@ async function writeDiary() {
           </div>
         </div>
       )}
-
+{/* ══ 日历弹窗 ══ */}
         {showCalendar && (() => {
     const gd = gameDay > 0 ? gameDate(gameDay) : { y: new Date().getFullYear(), m: new Date().getMonth()+1, d: new Date().getDate() }
     const calData = getCalendarData(calYear, calMonth, periodDays, gd)
@@ -1942,6 +1962,121 @@ async function writeDiary() {
     )
   })()}
 
+  {/* 衣帽间弹窗 */}
+{showWardrobe && (
+  <div onClick={() => setShowWardrobe(false)} style={{
+    position: 'fixed', inset: 0, zIndex: 250,
+    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+  }}>
+    <div onClick={e => e.stopPropagation()} style={{
+      width: '100%', maxWidth: '480px',
+      background: 'rgba(10,7,4,0.97)',
+      border: '1px solid rgba(201,169,110,0.12)',
+      borderRadius: '20px 20px 0 0',
+      padding: '20px 20px 44px', maxHeight: '70vh', overflowY: 'auto',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>衣帽间</div>
+        <button onClick={() => setShowWardrobe(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+      </div>
+
+      <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', marginBottom: '14px' }}>
+        当前：{ALL_OUTFITS.find(o => o.id === currentOutfit)?.name || '白衬衫'}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {getOwnedOutfits(wardrobe).map(o => (
+          <button key={o.id} onClick={() => {
+            setCurrentOutfit(o.id)
+            setShowWardrobe(false)
+            sendToAI(`她让他换上了${o.name}，${o.desc}，他换好后的反应，一句话`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+            saveToDb(messages, intimacy, playerRoom, luRoom)
+          }} style={{
+            padding: '12px 14px', textAlign: 'left',
+            background: currentOutfit === o.id ? 'rgba(201,169,110,0.1)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${currentOutfit === o.id ? 'rgba(201,169,110,0.3)' : 'rgba(255,255,255,0.06)'}`,
+            borderRadius: '12px', cursor: 'pointer',
+            color: currentOutfit === o.id ? '#c9a96e' : 'rgba(255,255,255,0.5)',
+            fontFamily: 'Georgia, serif',
+          }}>
+            <div style={{ fontSize: '13px', marginBottom: '3px' }}>{o.name}</div>
+            <div style={{ fontSize: '10px', opacity: 0.5 }}>{o.desc}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+{/* 床头柜弹窗 */}
+{showBedside && (
+  <div onClick={() => setShowBedside(false)} style={{
+    position: 'fixed', inset: 0, zIndex: 250,
+    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+  }}>
+    <div onClick={e => e.stopPropagation()} style={{
+      width: '100%', maxWidth: '480px',
+      background: 'rgba(10,7,4,0.97)',
+      border: '1px solid rgba(201,169,110,0.12)',
+      borderRadius: '20px 20px 0 0',
+      padding: '20px 20px 44px', maxHeight: '70vh', overflowY: 'auto',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>床头柜</div>
+        <button onClick={() => setShowBedside(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+      </div>
+
+      {bedsideItems.length === 0 ? (
+        <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.3)', textAlign: 'center', padding: '20px 0' }}>
+          空空如也…去商场逛逛？
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.3)', marginBottom: '10px' }}>
+            {intimatePhase !== 'idle' ? '选一件使用' : '氛围道具可随时使用，情趣道具在亲密时使用'}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {getOwnedBedsideItems(bedsideItems).map(item => {
+              const isIntimate = item.category === 'intimate'
+              const canUse = !isIntimate || (intimatePhase !== 'idle')
+              return (
+                <button key={item.id} onClick={() => {
+                  if (!canUse) { setToast('亲密时才能使用'); return }
+                  setShowBedside(false)
+                  if (item.category === 'ambiance') {
+                    const boost = parseInt(item.effect?.replace('romantic+','') || '10')
+                    setRomantic(n => Math.min(100, n + boost))
+                    sendToAI(`她拿出了${item.name}（${item.desc}），营造氛围，你的反应`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                  } else if (item.hint) {
+                    sendToAI(item.hint, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                  }
+                  if (item.consumable) {
+                    setBedsideItems(prev => prev.filter(id => id !== item.id))
+                  }
+                  saveToDb(messages, intimacy, playerRoom, luRoom)
+                }} style={{
+                  padding: '12px 14px', textAlign: 'left',
+                  background: isIntimate ? 'rgba(180,100,120,0.06)' : 'rgba(201,169,110,0.04)',
+                  border: `1px solid ${isIntimate ? 'rgba(180,100,120,0.15)' : 'rgba(201,169,110,0.1)'}`,
+                  borderRadius: '12px', cursor: canUse ? 'pointer' : 'default',
+                  opacity: canUse ? 1 : 0.4,
+                  color: 'rgba(255,255,255,0.5)', fontFamily: 'Georgia, serif',
+                }}>
+                  <div style={{ fontSize: '13px', marginBottom: '3px', color: isIntimate ? 'rgba(200,130,150,0.8)' : 'rgba(201,169,110,0.7)' }}>
+                    {item.name}
+                  </div>
+                  <div style={{ fontSize: '10px', opacity: 0.5 }}>{item.desc}</div>
+                  {item.consumable && <div style={{ fontSize: '9px', color: 'rgba(255,180,60,0.4)', marginTop: '2px' }}>· 消耗品</div>}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+)}
       <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} />
       {/* Toast */}
       {toast && (
