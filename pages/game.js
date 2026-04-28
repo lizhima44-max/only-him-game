@@ -3,7 +3,7 @@
    import { useRouter } from 'next/router'
    import { callAI, callFallback, loadApiConfig } from '../lib/apiClient'
    import SettingsPanel from '../components/SettingsPanel'
-   import { processNewDay, getContextPrompt, gameDate, realDateStr, getWeatherInfo, getSeasonInfo, togglePeriodDay, getCalendarData, predictNextPeriod, checkIsPeriod } from '../lib/gameSystems'
+   import { processNewDay, getContextPrompt, realDate, realDateStr, todayStr, isNewRealDay, fetchRealWeather, getWeatherInfo, getSeasonInfo, togglePeriodDay, getCalendarData, predictNextPeriod, checkIsPeriod, PLANTS, MAX_POTS, plantSeed, waterPlant, removePlant, updateGardenDaily, harvestPlant, getPlantDisplay, getGardenContextPrompt } from '../lib/gameSystems'
    import { ALL_OUTFITS, getOwnedOutfits, getOutfitHint,
          ALL_BEDSIDE_ITEMS, getOwnedBedsideItems } from '../lib/wardrobeItems'
    import { SUPERMARKET_ITEMS, SHOP_CATEGORIES, HER_OUTFITS, GIFTS, getShopItems,
@@ -260,6 +260,9 @@ const [bookList, setBookList] = useState(defaultBookList)
   const [showBedside, setShowBedside] = useState(false)
   // ── 商场/超市/宠物 ──
 const [coins, setCoins] = useState(500)
+const [lastDate, setLastDate] = useState('')
+const [garden, setGarden] = useState([])     // 阳台花盆 [{plantId, plantedDay, watered, stage}]
+const [showGarden, setShowGarden] = useState(false)
 const [pet, setPet] = useState(null)
 const [showShop, setShowShop] = useState(false)
 const [showSupermarket, setShowSupermarket] = useState(false)
@@ -300,12 +303,66 @@ const [cart, setCart] = useState([])
         setBookList(data.book_list?.length > 0 ? data.book_list : defaultBookList)
         setCandleLit(data.candle_lit || false)
         setCoins(data.coins ?? 500)
+        setLastDate(data.last_date || '')
+        setGarden(data.garden || [])
         setPet(data.pet || null)
         // 其中 defaultFridge 和 defaultBookList 是现有的初始值
         setWardrobe(data.wardrobe || ['daily_white', 'daily_black'])
         setCurrentOutfit(data.current_outfit || 'daily_white')
         setBedsideItems(data.bedside_items || [])
-        setInitialized(true)
+                setInitialized(true)
+
+        // 自动检测新一天
+        const savedDate = data.last_date || ''
+        const today = todayStr()
+        if (savedDate !== today) {
+          // 新的一天！
+          setTimeout(async () => {
+            const realW = await fetchRealWeather().catch(() => null)
+            const result = processNewDay({
+              day: data.game_day || 0,
+              romantic: data.romantic || 0,
+              periodDays: data.period_days || [],
+            }, realW)
+
+            setGameDay(result.day)
+            setSeason(result.season)
+            setWeather(result.weather)
+            setTemp(result.temp)
+            setSickWho(result.sickWho)
+            setRomantic(result.romantic)
+            setCandleLit(false)
+            setIsPeriodNow(result.isPeriod)
+            setLastDate(today)
+            setCoins(prev => prev + 50)
+
+            // 花园每日更新
+            if (data.garden?.length > 0) {
+              const gardenResult = updateGardenDaily(data.garden, result.day, result.season)
+              setGarden(gardenResult.garden)
+              gardenResult.events.forEach(e => result.events.push(e))
+            }
+
+            // 宠物每日更新
+            if (data.pet) {
+              const updatedPet = updatePetDaily(data.pet)
+              setPet(updatedPet)
+              if (updatedPet.sick) result.events.push(`🤒 ${updatedPet.name}生病了！`)
+            }
+
+            const sysMsgs = result.events.map(e => ({ role: 'system', content: e }))
+            setMessages(prev => [...prev, ...sysMsgs])
+            setToast(result.events[0])
+
+            // 存档
+            const id = session.user.id
+            await supabase.from('game_saves').update({
+              game_day: result.day, season: result.season, weather: result.weather,
+              temp: result.temp, sick_who: result.sickWho, romantic: result.romantic,
+              candle_lit: false, is_period: result.isPeriod, last_date: today,
+            }).eq('user_id', id)
+          }, 500)
+        }
 
       } else {
         await supabase.from('game_saves').upsert(
@@ -375,6 +432,8 @@ async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
       current_outfit: currentOutfit,
       bedside_items: bedsideItems,
       coins: coins,
+      last_date: lastDate,
+      garden: garden,
       pet: pet,
       //
     updated_at: new Date().toISOString(),
@@ -933,12 +992,7 @@ setCoins(prev => prev + 50)
                      color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
                      letterSpacing: '0.05em', padding: '3px 8px', borderRadius: '12px',
               }}>⚙</button>
-              <button onClick={handleNewDay} style={{
-  fontSize: '9px', background: 'none',
-  border: '1px solid rgba(201,169,110,0.15)',
-  color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
-  letterSpacing: '0.05em', padding: '3px 8px', borderRadius: '12px',
-}}>🌅</button>
+              
 
 <button onClick={() => setShowCalendar(true)} style={{
   fontSize: '9px', background: 'none',
@@ -1128,7 +1182,7 @@ setCoins(prev => prev + 50)
                   ],
                   balcony: [
                     { label: '看星星', prompt: '她在阳台看星星，你跟出来了，说一句' },
-                    { label: '浇花', prompt: '她蹲下来浇花，你站在旁边，说一句' },
+                    { label: '🌱 花园', special: 'garden' },
                   ],
                   guest_room: [
                     { label: '坐会儿', prompt: '她进了客房坐下，你坐在对面，说一句' },
@@ -1181,6 +1235,9 @@ setCoins(prev => prev + 50)
                       )
                       if (a.special === 'bedside') return (
                         <button key="bedside" onClick={() => setShowBedside(true)} style={btnStyle()}>床头柜</button>
+                      )
+                      if (a.special === 'garden') return (
+                        <button key="garden" onClick={() => setShowGarden(true)} style={btnStyle()}>🌱 花园</button>
                       )
                       return (
                         <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
@@ -2544,6 +2601,126 @@ setCoins(prev => prev + 50)
     </div>
   </div>
 )}
+            {showGarden && (
+              <div onClick={() => setShowGarden(false)} style={{
+                position: 'fixed', inset: 0, zIndex: 250,
+                background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+                display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+              }}>
+                <div onClick={e => e.stopPropagation()} style={{
+                  width: '100%', maxWidth: '480px',
+                  background: 'rgba(10,7,4,0.97)',
+                  border: '1px solid rgba(201,169,110,0.12)',
+                  borderRadius: '20px 20px 0 0',
+                  padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>🌱 阳台花园</div>
+                    <button onClick={() => setShowGarden(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+                  </div>
+
+                  {/* 花盆列表 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }}>
+                    {Array.from({ length: MAX_POTS }).map((_, i) => {
+                      const pot = garden[i]
+                      if (!pot) {
+                        return (
+                          <div key={`empty-${i}`} style={{
+                            padding: '16px', textAlign: 'center',
+                            background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(201,169,110,0.1)',
+                            borderRadius: '12px', color: 'rgba(201,169,110,0.2)', fontSize: '11px',
+                          }}>
+                            🪴 空花盆
+                          </div>
+                        )
+                      }
+                      const display = getPlantDisplay(pot)
+                      return (
+                        <div key={i} style={{
+                          padding: '12px', textAlign: 'center',
+                          background: 'rgba(201,169,110,0.04)', border: '1px solid rgba(201,169,110,0.12)',
+                          borderRadius: '12px',
+                        }}>
+                          <div style={{ fontSize: '28px', marginBottom: '4px' }}>{display.emoji}</div>
+                          <div style={{ fontSize: '12px', color: '#c9a96e', marginBottom: '2px' }}>{display.name}</div>
+                          <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>{display.label}</div>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                            {display.needsWater && (
+                              <button onClick={() => {
+                                setGarden(waterPlant(garden, i))
+                                setToast(`💧 浇了${display.name}`)
+                                saveToDb(messages, intimacy, playerRoom, luRoom)
+                              }} style={{
+                                padding: '3px 10px', fontSize: '10px', background: 'rgba(80,160,255,0.1)',
+                                border: '1px solid rgba(80,160,255,0.2)', borderRadius: '14px',
+                                color: 'rgba(80,160,255,0.7)', cursor: 'pointer', fontFamily: 'Georgia, serif',
+                              }}>💧浇水</button>
+                            )}
+                            {display.canHarvest && (
+                              <button onClick={() => {
+                                const result = harvestPlant(garden, i, fridge)
+                                setGarden(result.garden)
+                                if (result.fridge) setFridge(result.fridge)
+                                if (result.romanticBoost) setRomantic(prev => Math.min(100, prev + result.romanticBoost))
+                                setToast(result.msg)
+                                if (result.isFlower) {
+                                  sendToAI(`她摘了一朵花送给你，你的反应`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                                }
+                                saveToDb(messages, intimacy, playerRoom, luRoom)
+                              }} style={{
+                                padding: '3px 10px', fontSize: '10px', background: 'rgba(201,169,110,0.1)',
+                                border: '1px solid rgba(201,169,110,0.2)', borderRadius: '14px',
+                                color: '#c9a96e', cursor: 'pointer', fontFamily: 'Georgia, serif',
+                              }}>🌾收获</button>
+                            )}
+                            <button onClick={() => {
+                              setGarden(removePlant(garden, i))
+                              setToast(`拔掉了${display.name}`)
+                              saveToDb(messages, intimacy, playerRoom, luRoom)
+                            }} style={{
+                              padding: '3px 8px', fontSize: '10px', background: 'none',
+                              border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px',
+                              color: 'rgba(255,255,255,0.2)', cursor: 'pointer', fontFamily: 'Georgia, serif',
+                            }}>拔掉</button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* 种植选择 */}
+                  {garden.length < MAX_POTS && (
+                    <>
+                      <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', marginBottom: '10px', letterSpacing: '0.1em' }}>选一颗种子</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {PLANTS.map(p => (
+                          <button key={p.id} onClick={() => {
+                            if (coins < p.price) { setToast('金币不足'); return }
+                            const result = plantSeed(garden, p.id, gameDay)
+                            setGarden(result.garden)
+                            setCoins(prev => prev - p.price)
+                            setToast(result.msg)
+                            sendToAI(`她在阳台种了一颗${p.name}${p.emoji}，你看到了，说一句`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                            saveToDb(messages, intimacy, playerRoom, luRoom)
+                          }} style={{
+                            padding: '8px 12px', textAlign: 'center',
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(201,169,110,0.1)', borderRadius: '10px',
+                            cursor: coins >= p.price ? 'pointer' : 'default',
+                            opacity: coins >= p.price ? 1 : 0.4,
+                            color: 'rgba(255,255,255,0.5)', fontFamily: 'Georgia, serif',
+                          }}>
+                            <div style={{ fontSize: '20px' }}>{p.emoji}</div>
+                            <div style={{ fontSize: '11px', marginTop: '2px' }}>{p.name}</div>
+                            <div style={{ fontSize: '9px', color: 'rgba(255,200,60,0.5)' }}>💰{p.price}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
       <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} />
       {/* Toast */}
       {toast && (
