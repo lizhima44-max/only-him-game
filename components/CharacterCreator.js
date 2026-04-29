@@ -99,51 +99,189 @@ export default function CharacterCreator({ show, onClose, userId, onComplete }) 
 setSaving(false)
 if (result.success) {
   localStorage.setItem('selectedCharId', 'custom')
+  localStorage.setItem('selectedCustomCharId', result.characterId)  // ← 加上这行
   onComplete?.(config)
 } else {
   setError('保存失败: ' + result.error)
 }
   }
 
-  // ── AI分析聊天记录 ──
-  async function handleAnalyze() {
-    if (!chatText.trim()) { setError('粘贴你们的对话进来'); return }
-    const apiConfig = loadApiConfig()
-    if (!apiConfig?.apiKey) { setError('需要先配置API Key'); return }
-    
-    setError('')
-    setAnalyzing(true)
+async function handleAnalyze() {
+  if (!chatText.trim()) { setError('请粘贴或上传聊天记录'); return }
+  const apiConfig = loadApiConfig()
+  if (!apiConfig?.apiKey) { setError('需要先配置API Key'); return }
+  
+  setError('')
+  setAnalyzing(true)
 
-    try {
-      const prompt = `分析以下聊天记录，提取AI角色的信息。只输出JSON，不要其他内容。
-JSON格式：
-{
-  "name": "角色名字",
-  "background": "根据对话推测的角色背景设定（1-2句）",
-  "personality": "性格特点（用逗号分隔的关键词）",
-  "speechStyle": "说话风格描述（1句话）",
-  "tags": ["标签1", "标签2", "标签3"],
-  "tagline": "一句话概括这个角色"
-}
+  try {
+    const textLength = chatText.length
+    const isDeepSeek = apiConfig.provider === 'deepseek' || 
+                       (apiConfig.provider === 'custom' && apiConfig.baseUrl?.includes('deepseek'))
+    
+    // 根据模型决定最大处理长度
+    // DeepSeek: 1M tokens ≈ 100万字符，基本不限
+    // 其他模型: 保守一点 5万字符
+    const MAX_SIZE = isDeepSeek ? 800000 : 50000  // DeepSeek 80万字符，其他5万
+    
+    let textToAnalyze = chatText
+    let wasTruncated = false
+    
+    if (textLength > MAX_SIZE) {
+      textToAnalyze = chatText.slice(0, MAX_SIZE)
+      wasTruncated = true
+      setError(`⚠️ 对话过长，${isDeepSeek ? '已截取前800KB' : '已截取前50KB'}。${isDeepSeek ? '如需更完整分析，请缩短到800KB以内' : '建议使用DeepSeek API获得更长上下文'}`)
+    }
+    
+    console.log(`[分析] 模型: ${apiConfig.provider}, 长上下文: ${isDeepSeek}, 文本长度: ${textLength}, 实际分析: ${textToAnalyze.length}`)
+
+    // 根据模型选择不同策略
+    let finalConfig
+    
+    if (isDeepSeek) {
+      // DeepSeek: 一次性全量分析
+      setError('🔍 正在深度阅读你们的对话...')
+      
+      const analyzePrompt = `你是一位角色分析专家。请仔细阅读以下完整的聊天记录，提取【他】的角色特征。
 
 聊天记录：
-${chatText.slice(0, 3000)}`
+${textToAnalyze}
 
+请输出 JSON 格式的角色配置，只输出JSON，不要其他内容：
+
+{
+  "name": "角色名字（从对话中推断）",
+  "background": "根据对话推断的背景设定，2-3句，要具体",
+  "personality": "性格描述，要具体到行为模式，如'表面冷漠但会偷看她'",
+  "speechStyle": "说话风格，引用具体例子，如'简短有力，常说「嗯」「过来」'",
+  "tags": ["标签1", "标签2", "标签3", "标签4", "标签5"],
+  "tagline": "一句话人设总结"
+}
+
+要求：
+1. 基于对话实际内容，不要编造
+2. 越具体越好，引用对话中的原话
+3. 如果信息不足，合理推测但要标注`
+      
       const reply = await callAI(
-        '你是角色分析专家。分析聊天记录提取角色信息，只输出纯JSON。',
-        [{ role: 'user', content: prompt }],
-        { ...apiConfig, maxTokens: 500 }
+        '你是角色分析专家，仔细阅读全部对话后生成角色配置，只输出纯JSON。',
+        [{ role: 'user', content: analyzePrompt }],
+        { ...apiConfig, maxTokens: 1500 }
       )
+      
+      finalConfig = extractJSON(reply)
+      
+    } else {
+      // 其他模型：分块分析 + 汇总
+      setError('📖 正在分块分析对话...')
+      
+      // 分块：每块 5000 字符，重叠 300
+      const chunkSize = 5000
+      const overlap = 300
+      const chunks = []
+      
+      for (let i = 0; i < textToAnalyze.length; i += chunkSize - overlap) {
+        const chunk = textToAnalyze.slice(i, i + chunkSize)
+        if (chunk.length > 300) chunks.push(chunk)
+        if (i + chunkSize >= textToAnalyze.length) break
+      }
+      
+      const MAX_CHUNKS = 8
+      const chunksToProcess = chunks.slice(0, MAX_CHUNKS)
+      
+      if (chunksToProcess.length === 0) {
+        throw new Error('对话内容太短，无法分析')
+      }
+      
+      console.log(`[分块分析] 共 ${chunks.length} 块，分析 ${chunksToProcess.length} 块`)
+      
+      // 逐块提取特征
+      const allFeatures = []
+      
+      for (let idx = 0; idx < chunksToProcess.length; idx++) {
+        setError(`📖 分析第 ${idx + 1}/${chunksToProcess.length} 段对话...`)
+        
+        const featurePrompt = `提取这段对话中【他】的角色特征，只输出JSON：
 
-      // 解析JSON
-      const jsonStr = reply.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-      const parsed = JSON.parse(jsonStr)
-      setAnalyzed(fillDefaults(parsed))
-    } catch (e) {
-      setError('分析失败，试试重新粘贴？' + (e.message || ''))
+{
+  "name": "名字",
+  "personalityTraits": ["性格关键词"],
+  "speechStyle": "说话风格描述",
+  "catchphrases": ["口头禅"],
+  "relationship": "对对方的态度"
+}
+
+对话：${chunksToProcess[idx]}`
+        
+        try {
+          const reply = await callAI(
+            '提取角色特征，只输出JSON。',
+            [{ role: 'user', content: featurePrompt }],
+            { ...apiConfig, maxTokens: 400 }
+          )
+          allFeatures.push(extractJSON(reply))
+        } catch (e) {
+          console.warn(`第${idx+1}块分析失败:`, e)
+        }
+      }
+      
+      if (allFeatures.length === 0) {
+        throw new Error('无法分析对话内容')
+      }
+      
+      // 汇总生成配置
+      setError('🎨 正在绘制他的样子...')
+      
+      const summaryPrompt = `基于以下特征汇总，生成角色配置JSON：
+
+${JSON.stringify(allFeatures, null, 2)}
+
+输出格式：
+{
+  "name": "角色名字",
+  "background": "背景设定，2-3句",
+  "personality": "性格描述",
+  "speechStyle": "说话风格",
+  "tags": ["标签1", "标签2", "标签3"],
+  "tagline": "一句话人设"
+}`
+      
+      const finalReply = await callAI(
+        '基于特征汇总生成角色配置，只输出JSON。',
+        [{ role: 'user', content: summaryPrompt }],
+        { ...apiConfig, maxTokens: 800 }
+      )
+      
+      finalConfig = extractJSON(finalReply)
     }
-    setAnalyzing(false)
+    
+    // 填充默认值并显示
+    setAnalyzed(fillDefaults(finalConfig))
+    
+    if (wasTruncated) {
+      setError(`✅ 分析完成！${isDeepSeek ? '对话较长，已分析前800KB' : '对话较长，已分析前50KB'}。如需更完整还原，建议缩短对话或使用DeepSeek API`)
+      setTimeout(() => setError(''), 5000)
+    } else {
+      setError('')
+    }
+    
+  } catch (e) {
+    console.error('[Analyze Error]', e)
+    setError('分析失败：' + (e.message || '未知错误。建议：①检查API Key是否正确 ②使用DeepSeek API处理长对话'))
   }
+  setAnalyzing(false)
+}
+
+// 辅助函数：从AI回复中提取JSON
+function extractJSON(str) {
+  let jsonStr = str.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  const start = jsonStr.indexOf('{')
+  const end = jsonStr.lastIndexOf('}')
+  if (start !== -1 && end !== -1) {
+    jsonStr = jsonStr.slice(start, end + 1)
+  }
+  return JSON.parse(jsonStr)
+}
 
   // ── AI分析结果确认保存 ──
 async function handleSaveAnalyzed() {
@@ -157,6 +295,7 @@ async function handleSaveAnalyzed() {
   // ... 后面不变
     if (result.success) {
       localStorage.setItem('selectedCharId', 'custom')
+      localStorage.setItem('selectedCustomCharId', result.characterId)  // ← 加上这行
       onComplete?.(analyzed)
     } else {
       setError('保存失败: ' + result.error)
@@ -329,95 +468,111 @@ async function handleSaveAnalyzed() {
         )}
 
         {/* ══════ 唤醒记忆（AI导入）══════ */}
-        {tab === 'summon' && (
-          <div>
-            {!analyzed ? (
-              <>
-                <div style={sectionTitle}>粘贴你们的对话</div>
-                <div style={sectionHint}>把你和他的聊天记录粘贴到这里，我来帮你找回他</div>
-                <textarea
-                  value={chatText}
-                  onChange={e => setChatText(e.target.value)}
-                  placeholder={"他：你怎么又回来这么晚\n我：加班嘛...\n他：下次告诉我，我来接你\n\n把你们的对话粘贴在这里..."}
-                  rows={8}
-                  style={{ ...inputStyle, resize: 'none', lineHeight: 1.8, marginBottom: '10px' }}
-                />
+{tab === 'summon' && (
+  <div>
+    {!analyzed ? (
+      <>
+        {/* 提示框 */}
+        <div style={{
+          fontSize: '10px',
+          color: 'rgba(201,169,110,0.4)',
+          background: 'rgba(201,169,110,0.05)',
+          padding: '8px 12px',
+          borderRadius: '10px',
+          marginBottom: '12px',
+          lineHeight: 1.6
+        }}>
+          💡 提示：
+          • 使用 <strong style={{color:'#c9a96e'}}>DeepSeek API</strong> 可一次性分析超长对话（支持100万字）
+          • 其他模型会自动分块分析（建议2万字以内效果最佳）
+          • 精选最近1-2周的对话，还原度最高
+        </div>
 
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                  <button onClick={() => fileRef.current?.click()} style={{
-                    flex: 1, padding: '10px', fontSize: '11px',
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '12px', cursor: 'pointer',
-                    color: 'rgba(180,210,255,0.4)', fontFamily: 'Georgia, serif',
-                  }}>📄 上传文件</button>
-                  <input ref={fileRef} type="file" accept=".txt,.json,.md" style={{ display: 'none' }} onChange={handleFile} />
-                  
-                  <button onClick={handleAnalyze} disabled={analyzing || !chatText.trim()} style={{
-                    flex: 2, padding: '10px',
-                    background: analyzing ? 'rgba(255,255,255,0.05)' : chatText.trim() ? 'linear-gradient(135deg, rgba(80,140,255,0.3), rgba(120,80,255,0.25))' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${chatText.trim() ? 'rgba(140,180,255,0.3)' : 'rgba(255,255,255,0.06)'}`,
-                    borderRadius: '12px', cursor: chatText.trim() ? 'pointer' : 'default',
-                    color: chatText.trim() ? 'rgba(230,240,255,0.9)' : 'rgba(180,210,255,0.2)',
-                    fontSize: '12px', letterSpacing: '0.1em', fontFamily: 'Georgia, serif',
-                  }}>
-                    {analyzing ? '正在寻找他的痕迹...' : '开始寻找'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              /* 分析结果预览 */
-              <div style={{ animation: 'fadeIn 0.5s ease' }}>
-                <div style={{ ...sectionTitle, marginBottom: '4px' }}>找到了。</div>
-                <div style={{ ...sectionHint, marginBottom: '16px' }}>确认一下，是不是他？</div>
+        <div style={sectionTitle}>粘贴你们的对话</div>
+        <div style={sectionHint}>把你和他的聊天记录粘贴到这里，我来帮你找回他</div>
+        <textarea
+          value={chatText}
+          onChange={e => setChatText(e.target.value)}
+          placeholder={"他：你怎么又回来这么晚\n我：加班嘛...\n他：下次告诉我，我来接你\n\n把你们的对话粘贴在这里..."}
+          rows={8}
+          style={{ ...inputStyle, resize: 'none', lineHeight: 1.8, marginBottom: '10px' }}
+        />
 
-                <div style={{
-                  padding: '16px', background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(140,190,255,0.12)', borderRadius: '14px',
-                  marginBottom: '16px',
-                }}>
-                  <div style={{ fontSize: '18px', color: 'rgba(220,235,255,0.95)', fontStyle: 'italic', marginBottom: '8px',
-                    textShadow: '0 0 12px rgba(80,160,255,0.4)' }}>{analyzed.name}</div>
-                  
-                  {analyzed.tags?.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px' }}>
-                      {analyzed.tags.map(tag => (
-                        <span key={tag} style={{
-                          padding: '3px 10px', fontSize: '10px',
-                          border: '1px solid rgba(140,190,255,0.15)',
-                          borderRadius: '20px', color: 'rgba(180,210,255,0.5)',
-                        }}>{tag}</span>
-                      ))}
-                    </div>
-                  )}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <button onClick={() => fileRef.current?.click()} style={{
+            flex: 1, padding: '10px', fontSize: '11px',
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '12px', cursor: 'pointer',
+            color: 'rgba(180,210,255,0.4)', fontFamily: 'Georgia, serif',
+          }}>📄 上传文件</button>
+          <input ref={fileRef} type="file" accept=".txt,.json,.md" style={{ display: 'none' }} onChange={handleFile} />
+          
+          <button onClick={handleAnalyze} disabled={analyzing || !chatText.trim()} style={{
+            flex: 2, padding: '10px',
+            background: analyzing ? 'rgba(255,255,255,0.05)' : chatText.trim() ? 'linear-gradient(135deg, rgba(80,140,255,0.3), rgba(120,80,255,0.25))' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${chatText.trim() ? 'rgba(140,180,255,0.3)' : 'rgba(255,255,255,0.06)'}`,
+            borderRadius: '12px', cursor: chatText.trim() ? 'pointer' : 'default',
+            color: chatText.trim() ? 'rgba(230,240,255,0.9)' : 'rgba(180,210,255,0.2)',
+            fontSize: '12px', letterSpacing: '0.1em', fontFamily: 'Georgia, serif',
+          }}>
+            {analyzing ? '正在寻找他的痕迹...' : '开始寻找'}
+          </button>
+        </div>
+      </>
+    ) : (
+      /* 分析结果预览 */
+      <div style={{ animation: 'fadeIn 0.5s ease' }}>
+        <div style={{ ...sectionTitle, marginBottom: '4px' }}>找到了。</div>
+        <div style={{ ...sectionHint, marginBottom: '16px' }}>确认一下，是不是他？</div>
 
-                  <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.5)', lineHeight: 1.9, marginBottom: '8px' }}>{analyzed.background}</div>
-                  <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.35)', fontStyle: 'italic' }}>"{analyzed.speechStyle}"</div>
-                </div>
+        <div style={{
+          padding: '16px', background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(140,190,255,0.12)', borderRadius: '14px',
+          marginBottom: '16px',
+        }}>
+          <div style={{ fontSize: '18px', color: 'rgba(220,235,255,0.95)', fontStyle: 'italic', marginBottom: '8px',
+            textShadow: '0 0 12px rgba(80,160,255,0.4)' }}>{analyzed.name}</div>
+          
+          {analyzed.tags?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px' }}>
+              {analyzed.tags.map(tag => (
+                <span key={tag} style={{
+                  padding: '3px 10px', fontSize: '10px',
+                  border: '1px solid rgba(140,190,255,0.15)',
+                  borderRadius: '20px', color: 'rgba(180,210,255,0.5)',
+                }}>{tag}</span>
+              ))}
+            </div>
+          )}
 
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={() => setAnalyzed(null)} style={{
-                    flex: 1, padding: '12px', background: 'none',
-                    border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px',
-                    color: 'rgba(255,255,255,0.25)', fontSize: '12px', cursor: 'pointer',
-                    fontFamily: 'Georgia, serif',
-                  }}>不是他</button>
-                  <button onClick={handleSaveAnalyzed} disabled={saving} style={{
-                    flex: 2, padding: '12px',
-                    background: saving ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, rgba(80,140,255,0.3), rgba(120,80,255,0.25))',
-                    border: '1px solid rgba(140,180,255,0.3)', borderRadius: '14px',
-                    cursor: saving ? 'not-allowed' : 'pointer',
-                    color: saving ? 'rgba(180,210,255,0.4)' : 'rgba(230,240,255,0.95)',
-                    fontSize: '13px', letterSpacing: '0.12em', fontFamily: 'Georgia, serif',
-                    boxShadow: saving ? 'none' : '0 4px 24px rgba(80,120,255,0.2)',
-                  }}>
-                    {saving ? '他正在赶来...' : '是他，呼唤他'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+          <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.5)', lineHeight: 1.9, marginBottom: '8px' }}>{analyzed.background}</div>
+          <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.35)', fontStyle: 'italic' }}>"{analyzed.speechStyle}"</div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => setAnalyzed(null)} style={{
+            flex: 1, padding: '12px', background: 'none',
+            border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px',
+            color: 'rgba(255,255,255,0.25)', fontSize: '12px', cursor: 'pointer',
+            fontFamily: 'Georgia, serif',
+          }}>不是他</button>
+          <button onClick={handleSaveAnalyzed} disabled={saving} style={{
+            flex: 2, padding: '12px',
+            background: saving ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, rgba(80,140,255,0.3), rgba(120,80,255,0.25))',
+            border: '1px solid rgba(140,180,255,0.3)', borderRadius: '14px',
+            cursor: saving ? 'not-allowed' : 'pointer',
+            color: saving ? 'rgba(180,210,255,0.4)' : 'rgba(230,240,255,0.95)',
+            fontSize: '13px', letterSpacing: '0.12em', fontFamily: 'Georgia, serif',
+            boxShadow: saving ? 'none' : '0 4px 24px rgba(80,120,255,0.2)',
+          }}>
+            {saving ? '他正在赶来...' : '是他，呼唤他'}
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+)}
 
         {/* 错误提示 */}
         {error && (
