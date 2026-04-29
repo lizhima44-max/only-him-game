@@ -363,11 +363,14 @@ async function handleSaveAnalyzed() {
   })
   
   if (result.success) {
-    // 👇 新增：保存重要回忆
-    if (analyzed.importantMemories && analyzed.importantMemories.length > 0) {
-      await saveCharacterMemories(supabase, userId, result.characterId, analyzed.importantMemories)
-      console.log('[MEMORY] 保存重要回忆:', analyzed.importantMemories.length)
-    }
+// 保存重要回忆
+if (analyzed.importantMemories && analyzed.importantMemories.length > 0) {
+  console.log('[MEMORY] 准备保存回忆:', analyzed.importantMemories)
+  const memoryResult = await saveCharacterMemories(supabase, userId, result.characterId, analyzed.importantMemories)
+  console.log('[MEMORY] 保存结果:', memoryResult)
+} else {
+  console.log('[MEMORY] 没有重要回忆需要保存')
+}
     
     // 可选：保存好感度到角色配置中
     if (analyzed.intimacyLevel !== undefined) {
