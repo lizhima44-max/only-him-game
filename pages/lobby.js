@@ -180,26 +180,28 @@ export default function Lobby() {
     else router.push('/game')
   }
 
-  async function handleEnter() {
-    const cfg = loadApiConfig()
-    if (!cfg?.apiKey) {
-      setShowModal(false)
-      setShowSettings(true)
-      return
-    }
-    if (selectedChar?.theme) {
-      localStorage.setItem('selectedCharId', selectedChar.id)
-      localStorage.setItem('selectedCharTheme', JSON.stringify(selectedChar.theme))
-      // 如果是自定义角色还要存 customId
-      if (selectedChar.isCustom) {
-        localStorage.setItem('selectedCustomCharId', selectedChar.id)
-      } else {
-        localStorage.removeItem('selectedCustomCharId')
-      }
-    }
+
+async function handleEnter() {
+  const cfg = loadApiConfig()
+  if (!cfg?.apiKey) {
     setShowModal(false)
-    router.push('/game')
+    setShowSettings(true)
+    return
   }
+  if (selectedChar?.theme) {
+    // 关键修复：自定义角色存 'custom'，预设角色存自己的 id
+    if (selectedChar.isCustom) {
+      localStorage.setItem('selectedCharId', 'custom')
+      localStorage.setItem('selectedCustomCharId', selectedChar.id)
+    } else {
+      localStorage.setItem('selectedCharId', selectedChar.id)
+      localStorage.removeItem('selectedCustomCharId')
+    }
+    localStorage.setItem('selectedCharTheme', JSON.stringify(selectedChar.theme))
+  }
+  setShowModal(false)
+  router.push('/game')
+}
 
   // ═══════════════════════════════════════════════════════════
   //  渲染单张卡片
