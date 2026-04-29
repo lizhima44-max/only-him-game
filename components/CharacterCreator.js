@@ -354,6 +354,10 @@ function extractJSON(str) {
   // ── AI分析结果确认保存 ──
 async function handleSaveAnalyzed() {
   if (!analyzed) return
+  // 👇 加这行调试
+  console.log('[DEBUG] 完整的 analyzed 对象:', JSON.stringify(analyzed, null, 2))
+  console.log('[DEBUG] importantMemories 字段:', analyzed.importantMemories)
+  console.log('[DEBUG] important_memories 字段:', analyzed.important_memories)
   setSaving(true)
   
   // 保存角色
