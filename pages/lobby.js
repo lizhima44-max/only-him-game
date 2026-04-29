@@ -4,7 +4,7 @@ import { useRouter } from 'next/router'
 import { loadApiConfig } from '../lib/apiClient'
 import SettingsPanel from '../components/SettingsPanel'
 import CharacterCreator from '../components/CharacterCreator'
-import { listCustomCharacters, deleteCustomCharacter } from '../lib/characterImport'
+import { listCustomCharacters, deleteCustomCharacter, saveCustomCharacter } from '../lib/characterImport'
 
 // ═══════════════════════════════════════════════════════════
 //  预设角色（敬请期待占位卡 + 陆绍桓）
@@ -208,11 +208,13 @@ async function handleEnter() {
           ...selectedChar,
           customData: {
             ...selectedChar.customData,
-            playerNickname: newNickname,
+            playerNickname: newNickname,              
           }
         }
         // 可选：保存到数据库
-         await saveCustomCharacter(supabase, userId, finalSelectedChar.customData)
+         if (finalSelectedChar.customData.customId) {
+  await saveCustomCharacter(supabase, userId, finalSelectedChar.customData)
+}
       }
     } else {
       // 已经有存的称呼，使用它
