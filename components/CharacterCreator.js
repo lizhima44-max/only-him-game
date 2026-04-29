@@ -177,6 +177,7 @@ async function handleAnalyze() {
       setError('🔍 正在深度阅读你们的对话...')
       
       const analyzePrompt = `你是一位角色分析专家。请仔细阅读以下完整的聊天记录，提取【他】的角色特征。
+      ⚠️ 重要：你必须输出 JSON，并且必须包含 "importantMemories" 字段，这是强制要求！
 
 聊天记录：
 ${textToAnalyze}
@@ -200,10 +201,14 @@ ${textToAnalyze}
 }
 
 要求：
-1. playerNickname 从对话中找出他对女主的称呼
-2. intimacyLevel 根据对话中两人的亲密度判断（刚认识=10-20，开始熟悉=30-40，牵手拥抱=50-60，亲吻=70-80，亲密关系=90+）
-3. importantMemories 提取至少2-3个这段对话中的关键事件/经典时刻/重要转折
-4. 所有描述基于对话实际内容，对话中没有的信息不要编造`
+1. importantMemories 是必填字段，即使没有也输出空数组 []
+2. 提取至少 3-5 个重要回忆
+3. importance 范围 1-5，5 最重要
+4. playerNickname 从对话中找出他对女主的称呼
+5. intimacyLevel 根据对话中两人的亲密度判断（刚认识=10-20，开始熟悉=30-40，牵手拥抱=50-60，亲吻=70-80，亲密关系=90+）
+6. importantMemories 提取至少2-3个这段对话中的关键事件/经典时刻/重要转折
+7. 所有描述基于对话实际内容，对话中没有的信息不要编造`
+
       
       const reply = await callAI(
         '你是角色分析专家，仔细阅读全部对话后生成角色配置，只输出纯JSON。',
@@ -212,6 +217,43 @@ ${textToAnalyze}
       )
       
       finalConfig = extractJSON(reply)
+      // 👇 👇 👇 在这里添加回忆补全逻辑 👇 👇 👇
+console.log('[DEBUG] AI返回的原始字段:', Object.keys(finalConfig))
+
+// 如果 AI 没输出 importantMemories，根据好感度生成默认的
+if (!finalConfig.importantMemories || finalConfig.importantMemories.length === 0) {
+  const intimacy = finalConfig.intimacyLevel || 50
+  let defaultMemories = []
+  
+  if (intimacy >= 80) {
+    defaultMemories = [
+      { title: "初次相遇", desc: "你们第一次聊天的那个瞬间，他记住了", importance: 5 },
+      { title: "敞开心扉", desc: "他向你说出藏在心里的话", importance: 5 },
+      { title: "成为彼此特别的人", desc: "你们的关系超越了普通朋友", importance: 5 }
+    ]
+  } else if (intimacy >= 50) {
+    defaultMemories = [
+      { title: "初次相遇", desc: "你们的第一次对话", importance: 5 },
+      { title: "慢慢靠近", desc: "他开始在意你的一切", importance: 4 }
+    ]
+  } else {
+    defaultMemories = [
+      { title: "初次相遇", desc: "你们第一次聊天的时刻", importance: 5 }
+    ]
+  }
+  
+  finalConfig.importantMemories = defaultMemories
+  console.log('[WARN] AI 未返回重要回忆，使用默认值（好感度:' + intimacy + '）')
+} else {
+  console.log('[OK] AI 返回了 ' + finalConfig.importantMemories.length + ' 条重要回忆')
+}
+
+// 确保好感度有值
+if (finalConfig.intimacyLevel === undefined) {
+  finalConfig.intimacyLevel = 50
+  console.log('[WARN] AI 未返回好感度，使用默认值 50')
+}
+// 👆 👆 👆 补全逻辑结束 👆 👆 👆
       
       // ✅ 好感度分析报告
       console.log('═══════════════════════════════════════════════════════')
