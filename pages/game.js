@@ -8,7 +8,8 @@
          ALL_BEDSIDE_ITEMS, getOwnedBedsideItems } from '../lib/wardrobeItems'
    import { SUPERMARKET_ITEMS, SHOP_CATEGORIES, HER_OUTFITS, GIFTS, getShopItems,
          PETS, createPet, updatePetDaily, feedPet, bathePet, strokePet,
-         getPetContextPrompt, getPetRandomAct } from '../lib/shopAndPet'        
+         getPetContextPrompt, getPetRandomAct } from '../lib/shopAndPet'     
+   import { loadCustomCharacter } from '../lib/characterImport'   
 
 const ROOMS = [
   { id: 'living_room', name: '客厅',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
@@ -55,7 +56,7 @@ const SCENE_FALLBACK = {
 // ══════════════════════════════════════════════════════
 //  角色配置（自定义导入时只需替换这个对象）
 // ══════════════════════════════════════════════════════
-const CHARACTER_CONFIG = {
+let CHARACTER_CONFIG = {
   id: 'lu_shaohuan',
   name: '陆绍桓',
   englishName: 'Lucas Lu',
@@ -279,6 +280,33 @@ const [cart, setCart] = useState([])
       if (!session) { router.push('/'); return }
       setUser(session.user)
       setUserId(session.user.id)
+      
+            // 检查是否选了自定义角色
+            const selectedCharId = localStorage.getItem('selectedCharId')
+            if (selectedCharId === 'custom') {
+              const customChar = await loadCustomCharacter(supabase, session.user.id, 'custom')
+              if (customChar) {
+                CHARACTER_CONFIG = {
+                  ...CHARACTER_CONFIG,
+                  id: customChar.id || 'custom',
+                  name: customChar.name || '他',
+                  englishName: customChar.englishName || '',
+                  images: {
+                    default: customChar.images?.default || '/assets/characters/lu_default.png',
+                    shy: customChar.images?.shy || customChar.images?.default || '/assets/characters/lu_default.png',
+                    intense: customChar.images?.intense || customChar.images?.default || '/assets/characters/lu_default.png',
+                    aftercare: customChar.images?.aftercare || customChar.images?.default || '/assets/characters/lu_default.png',
+                  },
+                  background: customChar.background || CHARACTER_CONFIG.background,
+                  personality: customChar.personality || CHARACTER_CONFIG.personality,
+                  speechStyle: customChar.speechStyle || CHARACTER_CONFIG.speechStyle,
+                  intimacyDesc: customChar.intimacyDesc?.length > 0 ? customChar.intimacyDesc : CHARACTER_CONFIG.intimacyDesc,
+                  diaryPrompt: customChar.diaryPrompt || CHARACTER_CONFIG.diaryPrompt,
+                  intimatePrefix: customChar.intimatePrefix || CHARACTER_CONFIG.intimatePrefix,
+                }
+                console.log('[CHAR] 加载自定义角色:', CHARACTER_CONFIG.name)
+              }
+            }
       const { data } = await supabase
         .from('game_saves').select('*')
         .eq('user_id', session.user.id).single()

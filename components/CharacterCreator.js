@@ -91,14 +91,18 @@ export default function CharacterCreator({ show, onClose, userId, onComplete }) 
       ],
     })
 
-    const result = await saveCustomCharacter(supabase, userId, config)
-    setSaving(false)
-    if (result.success) {
-      localStorage.setItem('selectedCharId', 'custom')
-      onComplete?.(config)
-    } else {
-      setError('保存失败: ' + result.error)
-    }
+  const result = await saveCustomCharacter(supabase, userId, {
+  ...config,
+  customId: `craft_${Date.now()}_${config.name}`
+})
+
+setSaving(false)
+if (result.success) {
+  localStorage.setItem('selectedCharId', 'custom')
+  onComplete?.(config)
+} else {
+  setError('保存失败: ' + result.error)
+}
   }
 
   // ── AI分析聊天记录 ──
@@ -142,11 +146,15 @@ ${chatText.slice(0, 3000)}`
   }
 
   // ── AI分析结果确认保存 ──
-  async function handleSaveAnalyzed() {
-    if (!analyzed) return
-    setSaving(true)
-    const result = await saveCustomCharacter(supabase, userId, analyzed)
-    setSaving(false)
+async function handleSaveAnalyzed() {
+  if (!analyzed) return
+  setSaving(true)
+  const result = await saveCustomCharacter(supabase, userId, {
+    ...analyzed,
+    customId: `ai_${Date.now()}_${analyzed.name}`
+  })
+  setSaving(false)
+  // ... 后面不变
     if (result.success) {
       localStorage.setItem('selectedCharId', 'custom')
       onComplete?.(analyzed)
