@@ -1,0 +1,465 @@
+// ══════════════════════════════════════════════════════
+//  创造你的他 — 角色导入/捏人面板
+//  components/CharacterCreator.js
+// ══════════════════════════════════════════════════════
+import { useState, useRef } from 'react'
+import { callAI, loadApiConfig } from '../lib/apiClient'
+import { fillDefaults, saveCustomCharacter } from '../lib/characterImport'
+import { supabase } from '../lib/supabase'
+
+export default function CharacterCreator({ show, onClose, userId, onComplete }) {
+  const [tab, setTab] = useState('craft')  // 'craft' | 'summon'
+  
+  // ── 捏人 ──
+  const [name, setName] = useState('')
+  const [bgText, setBgText] = useState('')
+  const [tags, setTags] = useState([])
+  const [speechStyle, setSpeechStyle] = useState('')
+  const [customTag, setCustomTag] = useState('')
+  const [step, setStep] = useState(1) // 1=名字 2=灵魂 3=声音 4=完成
+
+  // ── AI导入 ──
+  const [chatText, setChatText] = useState('')
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzed, setAnalyzed] = useState(null) // 解析结果
+
+  // ── 共用 ──
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const fileRef = useRef(null)
+
+  if (!show) return null
+
+  // 性格标签池
+  const TAG_POOL = [
+    { id: 'gentle', label: '温柔', emoji: '🌙' },
+    { id: 'cold', label: '高冷', emoji: '❄️' },
+    { id: 'tsundere', label: '傲娇', emoji: '💢' },
+    { id: 'possessive', label: '占有欲', emoji: '🔒' },
+    { id: 'loyal', label: '忠犬', emoji: '🐕' },
+    { id: 'dark', label: '腹黑', emoji: '🖤' },
+    { id: 'flirty', label: '撩人', emoji: '🌹' },
+    { id: 'shy', label: '闷骚', emoji: '🫣' },
+    { id: 'dom', label: '强势', emoji: '👑' },
+    { id: 'intellectual', label: '知性', emoji: '📖' },
+    { id: 'playful', label: '爱玩', emoji: '🎭' },
+    { id: 'protective', label: '护短', emoji: '🛡️' },
+    { id: 'jealous', label: '爱吃醋', emoji: '🍋' },
+    { id: 'mysterious', label: '神秘', emoji: '🌫️' },
+    { id: 'clingy', label: '黏人', emoji: '🧸' },
+    { id: 'rebel', label: '痞气', emoji: '🔥' },
+  ]
+
+  const SPEECH_STYLES = [
+    { id: 'short', label: '话少但句句戳心', desc: '简短有力，一句话让人心跳' },
+    { id: 'tender', label: '温柔细腻', desc: '声音很轻，说什么都像在哄你' },
+    { id: 'sharp', label: '毒舌傲娇', desc: '嘴上不饶人，行动很诚实' },
+    { id: 'flirty', label: '痞帅撩人', desc: '随时能把天聊到床上去' },
+    { id: 'poetic', label: '文艺知性', desc: '偶尔冒出让人心动的句子' },
+    { id: 'wild', label: '野性直球', desc: '想什么说什么，不玩暧昧' },
+  ]
+
+  // 切换标签
+  function toggleTag(tagId) {
+    if (tags.includes(tagId)) setTags(tags.filter(t => t !== tagId))
+    else if (tags.length < 5) setTags([...tags, tagId])
+  }
+
+  // ── 捏人完成 → 生成config ──
+  async function handleCraftComplete() {
+    if (!name.trim()) { setError('给他起个名字吧'); return }
+    setError('')
+    setSaving(true)
+
+    const selectedTags = tags.map(id => TAG_POOL.find(t => t.id === id)?.label).filter(Boolean)
+    const style = SPEECH_STYLES.find(s => s.id === speechStyle)
+
+    const config = fillDefaults({
+      name: name.trim(),
+      background: bgText.trim() || `一个${selectedTags.join('、')}的人，某天出现在她的生活里。`,
+      personality: selectedTags.length > 0
+        ? selectedTags.join('，') + '。'
+        : '温柔但带着距离感。',
+      speechStyle: style?.desc || '自然简短。',
+      tags: selectedTags,
+      tagline: bgText.trim() ? bgText.trim().slice(0, 20) : `${selectedTags.slice(0, 3).join(' · ')}`,
+      intimacyDesc: [
+        { upTo: 20, text: `他刚来，${tags.includes('cold') ? '眼神疏离但会偷偷看她' : tags.includes('flirty') ? '从第一天就开始撩' : '有些生疏，但不讨厌她'}。` },
+        { upTo: 40, text: `他开始${tags.includes('tsundere') ? '嘴硬心软' : tags.includes('shy') ? '不自觉脸红' : '找理由靠近她'}。` },
+        { upTo: 70, text: `他${tags.includes('possessive') ? '占有欲开始外露' : tags.includes('gentle') ? '温柔得让人心疼' : '不再掩饰在意'}。` },
+        { upTo: 999, text: `他${tags.includes('dom') ? '霸道又温柔，眼里只有她' : tags.includes('clingy') ? '每时每刻都想黏着她' : '完全沦陷，不再克制'}。` },
+      ],
+    })
+
+    const result = await saveCustomCharacter(supabase, userId, config)
+    setSaving(false)
+    if (result.success) {
+      localStorage.setItem('selectedCharId', 'custom')
+      onComplete?.(config)
+    } else {
+      setError('保存失败: ' + result.error)
+    }
+  }
+
+  // ── AI分析聊天记录 ──
+  async function handleAnalyze() {
+    if (!chatText.trim()) { setError('粘贴你们的对话进来'); return }
+    const apiConfig = loadApiConfig()
+    if (!apiConfig?.apiKey) { setError('需要先配置API Key'); return }
+    
+    setError('')
+    setAnalyzing(true)
+
+    try {
+      const prompt = `分析以下聊天记录，提取AI角色的信息。只输出JSON，不要其他内容。
+JSON格式：
+{
+  "name": "角色名字",
+  "background": "根据对话推测的角色背景设定（1-2句）",
+  "personality": "性格特点（用逗号分隔的关键词）",
+  "speechStyle": "说话风格描述（1句话）",
+  "tags": ["标签1", "标签2", "标签3"],
+  "tagline": "一句话概括这个角色"
+}
+
+聊天记录：
+${chatText.slice(0, 3000)}`
+
+      const reply = await callAI(
+        '你是角色分析专家。分析聊天记录提取角色信息，只输出纯JSON。',
+        [{ role: 'user', content: prompt }],
+        { ...apiConfig, maxTokens: 500 }
+      )
+
+      // 解析JSON
+      const jsonStr = reply.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      const parsed = JSON.parse(jsonStr)
+      setAnalyzed(fillDefaults(parsed))
+    } catch (e) {
+      setError('分析失败，试试重新粘贴？' + (e.message || ''))
+    }
+    setAnalyzing(false)
+  }
+
+  // ── AI分析结果确认保存 ──
+  async function handleSaveAnalyzed() {
+    if (!analyzed) return
+    setSaving(true)
+    const result = await saveCustomCharacter(supabase, userId, analyzed)
+    setSaving(false)
+    if (result.success) {
+      localStorage.setItem('selectedCharId', 'custom')
+      onComplete?.(analyzed)
+    } else {
+      setError('保存失败: ' + result.error)
+    }
+  }
+
+  // ── 上传文件 ──
+  function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => setChatText(ev.target.result)
+    reader.readAsText(file)
+  }
+
+  // ══════════════════ 渲染 ══════════════════
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(2,1,12,0.92)', backdropFilter: 'blur(16px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'Georgia, serif',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: '400px', maxHeight: '90vh',
+        overflowY: 'auto', padding: '28px 24px 40px',
+      }}>
+        {/* 标题 */}
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <div style={{ fontSize: '10px', color: 'rgba(200,220,255,0.4)', letterSpacing: '0.3em', marginBottom: '10px' }}>
+            与他重逢
+          </div>
+          <div style={{ fontSize: '22px', color: 'rgba(230,240,255,0.95)', fontStyle: 'italic', letterSpacing: '0.08em',
+            textShadow: '0 0 20px rgba(80,160,255,0.4)' }}>
+            {tab === 'craft' ? '创造你的他' : '唤醒你的他'}
+          </div>
+          <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.45)', marginTop: '8px', lineHeight: 1.8 }}>
+            {tab === 'craft' ? '从无到有，描摹他的模样' : '粘贴你们的对话，让他回来'}
+          </div>
+        </div>
+
+        {/* Tab切换 */}
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', justifyContent: 'center' }}>
+          {[
+            { id: 'craft', label: '✦ 亲手创造' },
+            { id: 'summon', label: '✧ 唤醒记忆' },
+          ].map(t => (
+            <button key={t.id} onClick={() => { setTab(t.id); setError('') }} style={{
+              padding: '8px 20px', fontSize: '12px',
+              background: tab === t.id ? 'rgba(255,255,255,0.08)' : 'transparent',
+              border: `1px solid ${tab === t.id ? 'rgba(140,190,255,0.3)' : 'rgba(255,255,255,0.06)'}`,
+              borderRadius: '20px', cursor: 'pointer',
+              color: tab === t.id ? 'rgba(220,235,255,0.9)' : 'rgba(180,210,255,0.3)',
+              fontFamily: 'Georgia, serif', transition: 'all 0.25s',
+            }}>{t.label}</button>
+          ))}
+        </div>
+
+        {/* ══════ 亲手创造 ══════ */}
+        {tab === 'craft' && (
+          <div>
+            {/* Step 1: 名字 */}
+            {step >= 1 && (
+              <div style={{ marginBottom: '22px', animation: 'fadeIn 0.5s ease' }}>
+                <div style={sectionTitle}>他叫什么？</div>
+                <div style={sectionHint}>给他一个名字，让他真实地存在</div>
+                <input
+                  value={name} onChange={e => setName(e.target.value)}
+                  placeholder="输入他的名字..."
+                  onKeyDown={e => { if (e.key === 'Enter' && name.trim()) setStep(2) }}
+                  style={inputStyle}
+                />
+                {step === 1 && name.trim() && (
+                  <button onClick={() => setStep(2)} style={nextBtn}>继续 →</button>
+                )}
+              </div>
+            )}
+
+            {/* Step 2: 灵魂（性格标签 + 背景） */}
+            {step >= 2 && (
+              <div style={{ marginBottom: '22px', animation: 'fadeIn 0.5s ease' }}>
+                <div style={sectionTitle}>他的灵魂是什么样的？</div>
+                <div style={sectionHint}>最多选5个，定义他的性格</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+                  {TAG_POOL.map(t => {
+                    const selected = tags.includes(t.id)
+                    return (
+                      <button key={t.id} onClick={() => toggleTag(t.id)} style={{
+                        padding: '6px 14px', fontSize: '12px',
+                        background: selected ? 'rgba(140,190,255,0.12)' : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${selected ? 'rgba(140,190,255,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                        borderRadius: '20px', cursor: 'pointer',
+                        color: selected ? 'rgba(200,225,255,0.9)' : 'rgba(180,210,255,0.35)',
+                        fontFamily: 'Georgia, serif', transition: 'all 0.2s',
+                      }}>{t.emoji} {t.label}</button>
+                    )
+                  })}
+                </div>
+
+                <div style={{ ...sectionHint, marginTop: '14px' }}>他从哪里来？为什么出现在你的生命里？</div>
+                <textarea
+                  value={bgText} onChange={e => setBgText(e.target.value)}
+                  placeholder="比如：从民国穿越来的大少爷，借住在我家..."
+                  rows={2}
+                  style={{ ...inputStyle, resize: 'none', lineHeight: 1.8 }}
+                />
+                {step === 2 && (
+                  <button onClick={() => setStep(3)} style={nextBtn}>继续 →</button>
+                )}
+              </div>
+            )}
+
+            {/* Step 3: 声音（说话风格） */}
+            {step >= 3 && (
+              <div style={{ marginBottom: '22px', animation: 'fadeIn 0.5s ease' }}>
+                <div style={sectionTitle}>他说话是什么感觉？</div>
+                <div style={sectionHint}>选一个最像他的声音</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {SPEECH_STYLES.map(s => (
+                    <button key={s.id} onClick={() => { setSpeechStyle(s.id); setStep(4) }} style={{
+                      padding: '12px 14px', textAlign: 'left',
+                      background: speechStyle === s.id ? 'rgba(140,190,255,0.08)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${speechStyle === s.id ? 'rgba(140,190,255,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                      borderRadius: '12px', cursor: 'pointer',
+                      fontFamily: 'Georgia, serif', transition: 'all 0.2s',
+                    }}>
+                      <div style={{ fontSize: '13px', color: speechStyle === s.id ? 'rgba(220,235,255,0.9)' : 'rgba(200,220,255,0.6)', marginBottom: '3px' }}>{s.label}</div>
+                      <div style={{ fontSize: '10px', color: 'rgba(180,210,255,0.3)' }}>{s.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: 预览确认 */}
+            {step >= 4 && (
+              <div style={{ marginBottom: '10px', animation: 'fadeIn 0.5s ease' }}>
+                <div style={{ ...sectionTitle, marginBottom: '12px' }}>他来了。</div>
+                <div style={{
+                  padding: '16px', background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(140,190,255,0.12)', borderRadius: '14px',
+                  marginBottom: '16px',
+                }}>
+                  <div style={{ fontSize: '18px', color: 'rgba(220,235,255,0.95)', fontStyle: 'italic', marginBottom: '6px',
+                    textShadow: '0 0 12px rgba(80,160,255,0.4)' }}>{name}</div>
+                  <div style={{ fontSize: '10px', color: 'rgba(180,210,255,0.4)', marginBottom: '10px' }}>
+                    {tags.map(id => TAG_POOL.find(t => t.id === id)?.label).filter(Boolean).join(' · ')}
+                  </div>
+                  {bgText && <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.5)', lineHeight: 1.8, marginBottom: '6px' }}>{bgText}</div>}
+                  <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.35)', fontStyle: 'italic' }}>
+                    {SPEECH_STYLES.find(s => s.id === speechStyle)?.desc}
+                  </div>
+                </div>
+
+                <button onClick={handleCraftComplete} disabled={saving} style={{
+                  width: '100%', padding: '14px',
+                  background: saving ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, rgba(80,140,255,0.3), rgba(120,80,255,0.25))',
+                  border: '1px solid rgba(140,180,255,0.3)', borderRadius: '14px',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  color: saving ? 'rgba(180,210,255,0.4)' : 'rgba(230,240,255,0.95)',
+                  fontSize: '14px', letterSpacing: '0.16em', fontFamily: 'Georgia, serif',
+                  boxShadow: saving ? 'none' : '0 4px 24px rgba(80,120,255,0.2)',
+                  textShadow: saving ? 'none' : '0 0 12px rgba(100,180,255,0.5)',
+                }}>
+                  {saving ? '他正在赶来...' : '呼唤他'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══════ 唤醒记忆（AI导入）══════ */}
+        {tab === 'summon' && (
+          <div>
+            {!analyzed ? (
+              <>
+                <div style={sectionTitle}>粘贴你们的对话</div>
+                <div style={sectionHint}>把你和他的聊天记录粘贴到这里，我来帮你找回他</div>
+                <textarea
+                  value={chatText}
+                  onChange={e => setChatText(e.target.value)}
+                  placeholder={"他：你怎么又回来这么晚\n我：加班嘛...\n他：下次告诉我，我来接你\n\n把你们的对话粘贴在这里..."}
+                  rows={8}
+                  style={{ ...inputStyle, resize: 'none', lineHeight: 1.8, marginBottom: '10px' }}
+                />
+
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                  <button onClick={() => fileRef.current?.click()} style={{
+                    flex: 1, padding: '10px', fontSize: '11px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '12px', cursor: 'pointer',
+                    color: 'rgba(180,210,255,0.4)', fontFamily: 'Georgia, serif',
+                  }}>📄 上传文件</button>
+                  <input ref={fileRef} type="file" accept=".txt,.json,.md" style={{ display: 'none' }} onChange={handleFile} />
+                  
+                  <button onClick={handleAnalyze} disabled={analyzing || !chatText.trim()} style={{
+                    flex: 2, padding: '10px',
+                    background: analyzing ? 'rgba(255,255,255,0.05)' : chatText.trim() ? 'linear-gradient(135deg, rgba(80,140,255,0.3), rgba(120,80,255,0.25))' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${chatText.trim() ? 'rgba(140,180,255,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                    borderRadius: '12px', cursor: chatText.trim() ? 'pointer' : 'default',
+                    color: chatText.trim() ? 'rgba(230,240,255,0.9)' : 'rgba(180,210,255,0.2)',
+                    fontSize: '12px', letterSpacing: '0.1em', fontFamily: 'Georgia, serif',
+                  }}>
+                    {analyzing ? '正在寻找他的痕迹...' : '开始寻找'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* 分析结果预览 */
+              <div style={{ animation: 'fadeIn 0.5s ease' }}>
+                <div style={{ ...sectionTitle, marginBottom: '4px' }}>找到了。</div>
+                <div style={{ ...sectionHint, marginBottom: '16px' }}>确认一下，是不是他？</div>
+
+                <div style={{
+                  padding: '16px', background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(140,190,255,0.12)', borderRadius: '14px',
+                  marginBottom: '16px',
+                }}>
+                  <div style={{ fontSize: '18px', color: 'rgba(220,235,255,0.95)', fontStyle: 'italic', marginBottom: '8px',
+                    textShadow: '0 0 12px rgba(80,160,255,0.4)' }}>{analyzed.name}</div>
+                  
+                  {analyzed.tags?.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px' }}>
+                      {analyzed.tags.map(tag => (
+                        <span key={tag} style={{
+                          padding: '3px 10px', fontSize: '10px',
+                          border: '1px solid rgba(140,190,255,0.15)',
+                          borderRadius: '20px', color: 'rgba(180,210,255,0.5)',
+                        }}>{tag}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.5)', lineHeight: 1.9, marginBottom: '8px' }}>{analyzed.background}</div>
+                  <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.35)', fontStyle: 'italic' }}>"{analyzed.speechStyle}"</div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => setAnalyzed(null)} style={{
+                    flex: 1, padding: '12px', background: 'none',
+                    border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px',
+                    color: 'rgba(255,255,255,0.25)', fontSize: '12px', cursor: 'pointer',
+                    fontFamily: 'Georgia, serif',
+                  }}>不是他</button>
+                  <button onClick={handleSaveAnalyzed} disabled={saving} style={{
+                    flex: 2, padding: '12px',
+                    background: saving ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, rgba(80,140,255,0.3), rgba(120,80,255,0.25))',
+                    border: '1px solid rgba(140,180,255,0.3)', borderRadius: '14px',
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    color: saving ? 'rgba(180,210,255,0.4)' : 'rgba(230,240,255,0.95)',
+                    fontSize: '13px', letterSpacing: '0.12em', fontFamily: 'Georgia, serif',
+                    boxShadow: saving ? 'none' : '0 4px 24px rgba(80,120,255,0.2)',
+                  }}>
+                    {saving ? '他正在赶来...' : '是他，呼唤他'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 错误提示 */}
+        {error && (
+          <div style={{
+            marginTop: '12px', padding: '10px 14px',
+            background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,100,100,0.15)',
+            borderRadius: '12px', fontSize: '11px', color: 'rgba(255,180,180,0.8)', lineHeight: 1.6,
+          }}>{error}</div>
+        )}
+
+        {/* 关闭 */}
+        <button onClick={onClose} style={{
+          display: 'block', margin: '20px auto 0', background: 'none', border: 'none',
+          color: 'rgba(180,210,255,0.25)', fontSize: '11px', cursor: 'pointer',
+          letterSpacing: '0.1em',
+        }}>返回</button>
+      </div>
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
+    </div>
+  )
+}
+
+// ── 样式 ──
+const sectionTitle = {
+  fontSize: '14px', color: 'rgba(220,235,255,0.85)',
+  letterSpacing: '0.08em', marginBottom: '4px',
+  textShadow: '0 0 12px rgba(80,160,255,0.3)',
+}
+
+const sectionHint = {
+  fontSize: '11px', color: 'rgba(180,210,255,0.35)',
+  letterSpacing: '0.06em', marginBottom: '12px', lineHeight: 1.7,
+}
+
+const inputStyle = {
+  width: '100%', padding: '13px 16px',
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px',
+  outline: 'none', color: 'rgba(230,240,255,0.95)',
+  fontSize: '14px', fontFamily: 'Georgia, serif', letterSpacing: '0.04em',
+}
+
+const nextBtn = {
+  display: 'block', margin: '10px 0 0 auto',
+  padding: '6px 16px', fontSize: '11px',
+  background: 'rgba(140,190,255,0.08)',
+  border: '1px solid rgba(140,190,255,0.2)', borderRadius: '20px',
+  color: 'rgba(200,225,255,0.7)', cursor: 'pointer',
+  fontFamily: 'Georgia, serif', letterSpacing: '0.1em',
+}

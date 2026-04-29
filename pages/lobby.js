@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/router'
 import { loadApiConfig } from '../lib/apiClient'
 import SettingsPanel from '../components/SettingsPanel'
+import CharacterCreator from '../components/CharacterCreator'
 
 const CHARACTERS = [
   {
@@ -61,11 +62,14 @@ export default function Lobby() {
   const [showModal, setShowModal] = useState(false)
   const [selectedChar, setSelectedChar] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [showCreator, setShowCreator] = useState(false)
+  const [userId, setUserId] = useState(null)
   const animRef = useRef(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) router.push('/')
+      else setUserId(session.user.id)
     })
   }, [])
 
@@ -90,7 +94,7 @@ export default function Lobby() {
 
   function handleCardClick(char) {
     if (char.isPlaceholder) return
-    if (char.isCustom) return
+    if (char.isCustom) { setShowCreator(true); return }
     setSelectedChar(char)
     setShowModal(true)
   }
@@ -506,13 +510,29 @@ export default function Lobby() {
           show={showSettings}
           onClose={() => {
             setShowSettings(false)
-            // 如果是从"呼唤他"触发的，关闭后检查key，有就直接进
             const cfg = loadApiConfig()
             if (cfg?.apiKey && selectedChar) {
               if (selectedChar.theme) {
                 localStorage.setItem('selectedCharId', selectedChar.id)
                 localStorage.setItem('selectedCharTheme', JSON.stringify(selectedChar.theme))
               }
+              router.push('/game')
+            }
+          }}
+        />
+
+        {/* 角色创造面板 */}
+        <CharacterCreator
+          show={showCreator}
+          userId={userId}
+          onClose={() => setShowCreator(false)}
+          onComplete={(config) => {
+            setShowCreator(false)
+            // 检查API Key
+            const cfg = loadApiConfig()
+            if (!cfg?.apiKey) {
+              setShowSettings(true)
+            } else {
               router.push('/game')
             }
           }}
