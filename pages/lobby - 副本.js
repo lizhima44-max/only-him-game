@@ -6,22 +6,8 @@ import SettingsPanel from '../components/SettingsPanel'
 import CharacterCreator from '../components/CharacterCreator'
 import { listCustomCharacters, deleteCustomCharacter } from '../lib/characterImport'
 
-// ═══════════════════════════════════════════════════════════
-//  预设角色（敬请期待占位卡 + 陆绍桓）
-// ═══════════════════════════════════════════════════════════
+// 预设角色（陆绍桓）
 const DEFAULT_CHARACTERS = [
-  {
-    id: 'coming_1',
-    name: '···',
-    en: '',
-    tag: '敬请期待',
-    desc: '',
-    tags: [],
-    cardImg: null,
-    isPlaceholder: true,
-    theme: null,
-    glowColor: 'rgba(80,130,255,0.3)',
-  },
   {
     id: 'lu',
     name: '陆绍桓',
@@ -55,47 +41,20 @@ export default function Lobby() {
   const [selectedChar, setSelectedChar] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showCreator, setShowCreator] = useState(false)
-  const [showCharList, setShowCharList] = useState(false)
+  const [showCharList, setShowCharList] = useState(false)  // 自定义角色列表弹窗
   const [customChars, setCustomChars] = useState([])
   const [userId, setUserId] = useState(null)
-  const [allCards, setAllCards] = useState([])
+  
+  // 合并所有卡片（预设 + 自定义入口）
+  const [allCards, setAllCards] = useState([
+    ...DEFAULT_CHARACTERS,
+    { id: 'custom_entry', isCustomEntry: true, name: '与他重逢', tag: '创造或导入你的故事' }
+  ])
 
-  // 鼠标拖拽滑动
+  // 鼠标拖拽滑动相关
   const [isDragging, setIsDragging] = useState(false)
   const [startX, setStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
-
-  // 构建卡片列表：占位卡 + 预设卡 + 自定义卡 + 入口卡
-  const buildCards = (customList) => {
-    const customCards = customList.map(char => ({
-      id: char.id,
-      name: char.name,
-      tag: char.tagline || '自定义角色',
-      desc: char.characterData?.background || '一个特别的他',
-      tags: char.tags || [],
-      cardImg: char.characterData?.images?.default || null,
-      isCustom: true,
-      customData: char.characterData,
-      theme: {
-        primary: '80,140,220',
-        accent: '120,180,255',
-        glow: 'rgba(100,160,255,0.35)',
-        cardBg: 'linear-gradient(160deg, #0e1830 0%, #060c1e 60%, #0a1228 100%)',
-        borderActive: 'rgba(120,180,255,0.4)',
-        btnBg: 'linear-gradient(135deg, rgba(80,140,255,0.25), rgba(60,100,220,0.35))',
-        btnBorder: 'rgba(100,170,255,0.35)',
-        btnColor: 'rgba(190,225,255,0.9)',
-        tagBorder: 'rgba(100,170,255,0.2)',
-        tagColor: 'rgba(120,180,255,0.5)',
-      }
-    }))
-    
-    return [
-      ...DEFAULT_CHARACTERS,
-      ...customCards,
-      { id: 'custom_entry', isCustomEntry: true, name: '与他重逢', tag: '创造或导入你的故事' }
-    ]
-  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -104,18 +63,18 @@ export default function Lobby() {
     })
   }, [])
 
+  // 加载自定义角色列表
   const loadCustomChars = async () => {
     if (!userId) return
     const chars = await listCustomCharacters(supabase, userId)
     setCustomChars(chars)
-    setAllCards(buildCards(chars))
   }
 
   useEffect(() => {
     if (userId) loadCustomChars()
   }, [userId])
 
-  // 滚动检测高亮中间卡片
+  // 滑动检测（触摸）
   useEffect(() => {
     const track = trackRef.current
     if (!track) return
@@ -132,7 +91,7 @@ export default function Lobby() {
     }
     track.addEventListener('scroll', onScroll, { passive: true })
     return () => track.removeEventListener('scroll', onScroll)
-  }, [allCards])
+  }, [])
 
   // 鼠标拖拽滑动
   const handleMouseDown = (e) => {
@@ -149,10 +108,12 @@ export default function Lobby() {
     trackRef.current.scrollLeft = scrollLeft - walk
   }
 
-  const handleMouseUp = () => setIsDragging(false)
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
 
-  function handleCardClick(char) {
-    if (char.isPlaceholder) return  // 占位卡不可点
+  function handleCardClick(char, idx) {
+    if (char.isPlaceholder) return
     if (char.isCustomEntry) {
       setShowCharList(true)
       loadCustomChars()
@@ -173,7 +134,13 @@ export default function Lobby() {
   function handleSelectCustom(char) {
     localStorage.setItem('selectedCharId', 'custom')
     localStorage.setItem('selectedCustomCharId', char.id)
-    localStorage.setItem('selectedCharTheme', JSON.stringify(char.theme))
+    localStorage.setItem('selectedCharTheme', JSON.stringify({
+      primary: '80,140,220',
+      accent: '120,180,255',
+      btnBg: 'linear-gradient(135deg, rgba(80,140,255,0.25), rgba(60,100,220,0.35))',
+      btnBorder: 'rgba(100,170,255,0.35)',
+      btnColor: 'rgba(190,225,255,0.9)',
+    }))
     setShowCharList(false)
     const cfg = loadApiConfig()
     if (!cfg?.apiKey) setShowSettings(true)
@@ -190,34 +157,23 @@ export default function Lobby() {
     if (selectedChar?.theme) {
       localStorage.setItem('selectedCharId', selectedChar.id)
       localStorage.setItem('selectedCharTheme', JSON.stringify(selectedChar.theme))
-      // 如果是自定义角色还要存 customId
-      if (selectedChar.isCustom) {
-        localStorage.setItem('selectedCustomCharId', selectedChar.id)
-      } else {
-        localStorage.removeItem('selectedCustomCharId')
-      }
     }
     setShowModal(false)
     router.push('/game')
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  渲染单张卡片
-  // ═══════════════════════════════════════════════════════════
+  // 渲染单个卡片
   const renderCard = (char, idx) => {
     const isActive = activeIdx === idx
-    const isPlaceholder = char.isPlaceholder
     const isCustomEntry = char.isCustomEntry
+    const isPlaceholder = char.isPlaceholder
     const theme = char.theme
-    const glowColor = theme?.glow || char.glowColor || 'rgba(80,130,255,0.2)'
+    const glowColor = theme?.glow || 'rgba(80,130,255,0.2)'
 
-    // 卡片基础样式
-    let cardStyle = {
-      flexShrink: 0,
-      scrollSnapAlign: 'center',
-      cursor: isPlaceholder ? 'default' : 'pointer',
-      borderRadius: '20px',
-      overflow: 'hidden',
+    const cardStyle = {
+      flexShrink: 0, scrollSnapAlign: 'center',
+      cursor: (isCustomEntry || isPlaceholder) ? 'pointer' : 'pointer',
+      borderRadius: '20px', overflow: 'hidden',
       transition: 'all 0.4s cubic-bezier(0.34,1.4,0.64,1)',
       position: 'relative',
       width: isActive ? '185px' : '138px',
@@ -225,118 +181,55 @@ export default function Lobby() {
       opacity: isActive ? 1 : 0.38,
       transform: isActive ? 'scale(1)' : 'scale(0.86)',
       boxShadow: isActive ? `0 0 25px ${glowColor}, 0 0 50px ${glowColor}` : 'none',
-    }
-
-    // 根据卡片类型设置背景/边框
-    if (isPlaceholder) {
-      cardStyle = {
-        ...cardStyle,
-        background: isActive ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
-        backdropFilter: 'blur(18px)',
-        border: isActive ? '1px solid rgba(140,190,255,0.3)' : '1px solid rgba(100,150,255,0.08)',
-      }
-    } else if (isCustomEntry) {
-      cardStyle = {
-        ...cardStyle,
+      ...(isCustomEntry ? {
         background: isActive ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
         backdropFilter: 'blur(18px)',
         border: isActive ? '1px solid rgba(160,210,255,0.35)' : '1px dashed rgba(140,200,255,0.1)',
-      }
-    } else {
-      cardStyle = {
-        ...cardStyle,
+      } : isPlaceholder ? {
+        background: isActive ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
+        backdropFilter: 'blur(18px)',
+        border: isActive ? '1px solid rgba(140,190,255,0.3)' : '1px solid rgba(100,150,255,0.08)',
+      } : {
         background: theme?.cardBg || '#080c18',
         border: isActive ? `1px solid ${theme?.borderActive || 'rgba(100,180,255,0.5)'}` : '1px solid rgba(80,140,255,0.12)',
-      }
+      }),
     }
 
     const glowWrapStyle = {
-      flexShrink: 0,
-      scrollSnapAlign: 'center',
-      position: 'relative',
-      borderRadius: '22px',
-      transition: 'all 0.4s',
+      flexShrink: 0, scrollSnapAlign: 'center', position: 'relative',
+      borderRadius: '22px', transition: 'all 0.4s',
       boxShadow: isActive ? `0 0 30px ${glowColor}, 0 0 60px ${glowColor}` : 'none',
     }
 
     return (
-      <div key={char.id} style={glowWrapStyle} onClick={() => handleCardClick(char)}>
+      <div key={char.id} style={glowWrapStyle} onClick={() => handleCardClick(char, idx)}>
         <div style={{ ...cardStyle, boxShadow: 'none' }}>
-          
-          {/* 占位卡片：敬请期待 */}
-          {isPlaceholder && (
-            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', padding: '20px' }}>
-              <div style={{
-                width: '56px', height: '56px', borderRadius: '50%',
-                border: isActive ? '1px solid rgba(140,190,255,0.4)' : '1px solid rgba(100,160,255,0.08)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '22px',
-                color: isActive ? 'rgba(160,210,255,0.7)' : 'rgba(100,150,255,0.2)',
-                transition: 'all 0.4s',
-              }}>✦</div>
-              <div style={{
-                fontSize: isActive ? '12px' : '10px',
-                color: isActive ? 'rgba(180,220,255,0.8)' : 'rgba(120,160,255,0.18)',
-                textAlign: 'center', lineHeight: 2,
-                transition: 'all 0.4s',
-              }}>
-                敬请期待<br />
-                <span style={{ fontSize: '9px', opacity: 0.65 }}>COMING SOON</span>
-              </div>
-            </div>
-          )}
-
-          {/* 与他重逢入口卡片 */}
-          {!isPlaceholder && isCustomEntry && (
-            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', padding: '20px' }}>
+          {isCustomEntry ? (
+            <div style={{
+              height: '100%', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: '14px', padding: '20px',
+            }}>
               <div style={{
                 width: '48px', height: '48px', borderRadius: '50%',
                 border: isActive ? '1px solid rgba(160,215,255,0.5)' : '1px solid rgba(140,200,255,0.12)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '24px',
-                color: isActive ? 'rgba(180,225,255,0.8)' : 'rgba(140,200,255,0.18)',
+                fontSize: '24px', color: isActive ? 'rgba(180,225,255,0.8)' : 'rgba(140,200,255,0.18)',
               }}>+</div>
               <div style={{
                 fontSize: isActive ? '13px' : '11px',
                 color: isActive ? 'rgba(200,230,255,0.85)' : 'rgba(140,200,255,0.2)',
                 textAlign: 'center', lineHeight: 1.9,
-              }}>
-                {char.name}<br />
-                <span style={{ fontSize: '10px', opacity: 0.65 }}>{char.tag}</span>
-              </div>
+              }}>{char.name}<br /><span style={{ fontSize: '10px', opacity: 0.65 }}>{char.tag}</span></div>
             </div>
-          )}
-
-          {/* 正常角色卡片（陆绍桓 / 自定义角色） */}
-          {!isPlaceholder && !isCustomEntry && (
+          ) : (
             <>
               <div style={{ position: 'absolute', inset: 0, background: theme?.cardBg }}>
-                {char.cardImg && (
-                  <img src={char.cardImg} alt={char.name} style={{
-                    width: '100%', height: '100%',
-                    objectFit: 'cover', objectPosition: 'center 8%',
-                  }} />
-                )}
-                <div style={{
-                  position: 'absolute', bottom: 0, left: 0, right: 0, height: '42%',
-                  background: 'linear-gradient(to top, rgba(6,10,28,0.98) 0%, rgba(6,10,28,0.6) 55%, transparent 100%)',
-                }} />
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: '22%',
-                  background: 'linear-gradient(to bottom, rgba(6,10,28,0.28), transparent)',
-                }} />
+                {char.cardImg && <img src={char.cardImg} alt={char.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 8%' }} />}
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '42%', background: 'linear-gradient(to top, rgba(6,10,28,0.98) 0%, rgba(6,10,28,0.6) 55%, transparent 100%)' }} />
               </div>
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 16px 16px', zIndex: 3 }}>
-                <div style={{
-                  fontSize: '16px', color: 'rgba(220,235,255,0.95)',
-                  letterSpacing: '0.06em', marginBottom: '5px',
-                  textShadow: isActive && theme ? `0 0 14px rgba(${theme.accent},0.7)` : 'none',
-                }}>{char.name}</div>
-                <div style={{
-                  fontSize: '9px',
-                  color: isActive && theme ? `rgba(${theme.accent},0.6)` : 'rgba(120,170,255,0.28)',
-                  letterSpacing: '0.1em',
-                }}>{char.tag}</div>
+                <div style={{ fontSize: '16px', color: 'rgba(220,235,255,0.95)', letterSpacing: '0.06em', marginBottom: '5px' }}>{char.name}</div>
+                <div style={{ fontSize: '9px', color: isActive && theme ? `rgba(${theme.accent},0.6)` : 'rgba(120,170,255,0.28)' }}>{char.tag}</div>
               </div>
             </>
           )}
@@ -362,17 +255,17 @@ export default function Lobby() {
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#020108' }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: '480px', height: '100%', overflow: 'hidden', fontFamily: 'Georgia, serif' }}>
           
-          {/* 背景图 */}
           <img src="/assets/lobby/lobby_bg.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
 
           <div style={{ position: 'relative', zIndex: 10, height: '100%', display: 'flex', flexDirection: 'column' }}>
             
-            {/* 顶部标题 + 设置按钮 */}
+            {/* 顶部 */}
             <div style={{ textAlign: 'center', padding: '32px 20px 8px', flexShrink: 0, position: 'relative' }}>
               <button onClick={() => setShowSettings(true)} style={{
                 position: 'absolute', top: '16px', right: '16px',
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: '50%', width: '32px', height: '32px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', fontSize: '14px', color: 'rgba(200,220,255,0.5)',
                 backdropFilter: 'blur(8px)',
               }}>⚙</button>
@@ -381,8 +274,8 @@ export default function Lobby() {
               <div style={{ fontSize: '11px', color: 'rgba(200,225,255,0.65)', letterSpacing: '0.2em', marginTop: '10px' }}>选择你的故事</div>
             </div>
 
-            {/* 卡片滑轨 */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}>
+            {/* 卡片滑轨 - 支持鼠标拖拽 */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'visible' }}>
               <div
                 ref={trackRef}
                 className="card-track"
@@ -418,9 +311,7 @@ export default function Lobby() {
             </div>
           </div>
 
-          {/* ═══════════════════════════════════════════════════════════ */}
           {/* 自定义角色列表弹窗 */}
-          {/* ═══════════════════════════════════════════════════════════ */}
           {showCharList && (
             <div onClick={() => setShowCharList(false)} style={{
               position: 'absolute', inset: 0, zIndex: 100,
@@ -435,7 +326,8 @@ export default function Lobby() {
 
                 {customChars.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(180,210,255,0.3)', fontSize: '13px' }}>
-                    还没有属于你的故事<br />点击下方按钮创造
+                    还没有属于你的故事<br />
+                    点击下方按钮创造
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
@@ -443,18 +335,15 @@ export default function Lobby() {
                       <div key={char.id} onClick={() => handleSelectCustom(char)} style={{
                         padding: '16px', background: 'rgba(255,255,255,0.04)',
                         border: '1px solid rgba(140,190,255,0.12)', borderRadius: '16px',
-                        cursor: 'pointer', position: 'relative',
+                        cursor: 'pointer', transition: 'all 0.2s',
+                        position: 'relative',
                       }}>
                         <div style={{ fontSize: '18px', color: 'rgba(220,235,255,0.95)', marginBottom: '6px' }}>{char.name}</div>
                         <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.4)' }}>{char.tagline}</div>
                         {char.tags?.length > 0 && (
                           <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
                             {char.tags.slice(0, 3).map(tag => (
-                              <span key={tag} style={{
-                                fontSize: '9px', padding: '2px 8px',
-                                border: '1px solid rgba(140,190,255,0.15)',
-                                borderRadius: '20px', color: 'rgba(180,210,255,0.5)',
-                              }}>{tag}</span>
+                              <span key={tag} style={{ fontSize: '9px', padding: '2px 8px', border: '1px solid rgba(140,190,255,0.15)', borderRadius: '20px', color: 'rgba(180,210,255,0.5)' }}>{tag}</span>
                             ))}
                           </div>
                         )}
@@ -484,9 +373,7 @@ export default function Lobby() {
             </div>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════ */}
           {/* 角色详情弹窗 */}
-          {/* ═══════════════════════════════════════════════════════════ */}
           {showModal && selectedChar && (
             <div onClick={() => setShowModal(false)} style={{
               position: 'absolute', inset: 0, zIndex: 100,
@@ -495,67 +382,30 @@ export default function Lobby() {
             }}>
               <div onClick={e => e.stopPropagation()} style={{ flex: '0 0 50%', position: 'relative', overflow: 'hidden' }}>
                 {selectedChar.cardImg ? (
-                  <img src={selectedChar.cardImg} alt={selectedChar.name} style={{
-                    width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 10%',
-                  }} />
+                  <img src={selectedChar.cardImg} alt={selectedChar.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 10%' }} />
                 ) : (
-                  <div style={{
-                    width: '100%', height: '100%', background: selectedChar.theme?.cardBg || '#080c18',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '48px', color: 'rgba(100,160,255,0.12)',
-                  }}>✦</div>
+                  <div style={{ width: '100%', height: '100%', background: selectedChar.theme?.cardBg || '#080c18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', color: 'rgba(100,160,255,0.12)' }}>✦</div>
                 )}
-                <div style={{
-                  position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%',
-                  background: 'linear-gradient(to top, rgba(4,7,20,1) 0%, transparent 100%)',
-                }} />
-                <button onClick={() => setShowModal(false)} style={{
-                  position: 'absolute', top: '16px', right: '16px',
-                  background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'rgba(255,255,255,0.45)', borderRadius: '50%',
-                  width: '32px', height: '32px', cursor: 'pointer',
-                }}>✕</button>
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: 'linear-gradient(to top, rgba(4,7,20,1) 0%, transparent 100%)' }} />
+                <button onClick={() => setShowModal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.45)', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer' }}>✕</button>
               </div>
 
-              <div onClick={e => e.stopPropagation()} style={{
-                flex: 1, display: 'flex', flexDirection: 'column',
-                background: 'linear-gradient(to bottom, rgba(4,7,20,1) 0%, #060c20 100%)',
-                borderTop: '1px solid rgba(80,160,255,0.08)', overflow: 'hidden',
-              }}>
+              <div onClick={e => e.stopPropagation()} style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'linear-gradient(to bottom, rgba(4,7,20,1) 0%, #060c20 100%)', borderTop: '1px solid rgba(80,160,255,0.08)', overflow: 'hidden' }}>
                 <div className="modal-desc" style={{ flex: 1, overflowY: 'auto', padding: '18px 24px 0' }}>
                   <div style={{ fontSize: '24px', color: 'rgba(215,230,255,0.95)', fontStyle: 'italic', marginBottom: '3px' }}>{selectedChar.name}</div>
-                  <div style={{ fontSize: '9px', color: 'rgba(140,190,255,0.4)', letterSpacing: '0.25em', marginBottom: '14px' }}>{selectedChar.en || ''}</div>
+                  <div style={{ fontSize: '9px', color: 'rgba(140,190,255,0.4)', letterSpacing: '0.25em', marginBottom: '14px' }}>{selectedChar.en}</div>
                   <div style={{ fontSize: '13px', color: 'rgba(185,215,245,0.6)', lineHeight: 2, marginBottom: '16px' }}>{selectedChar.desc}</div>
                   <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '20px' }}>
                     {selectedChar.tags?.map(tag => (
-                      <span key={tag} style={{
-                        padding: '4px 10px', borderRadius: '20px',
-                        border: `1px solid ${selectedChar.theme?.tagBorder || 'rgba(80,160,255,0.15)'}`,
-                        fontSize: '9px',
-                        color: selectedChar.theme?.tagColor || 'rgba(100,170,255,0.45)',
-                      }}>{tag}</span>
+                      <span key={tag} style={{ padding: '4px 10px', borderRadius: '20px', border: `1px solid ${selectedChar.theme?.tagBorder || 'rgba(80,160,255,0.15)'}`, fontSize: '9px', color: selectedChar.theme?.tagColor || 'rgba(100,170,255,0.45)' }}>{tag}</span>
                     ))}
                   </div>
                 </div>
 
                 <div style={{ padding: '14px 24px 40px', flexShrink: 0, background: 'linear-gradient(to bottom, transparent, rgba(6,10,28,0.95) 30%)' }}>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => setShowModal(false)} style={{
-                      flex: 1, padding: '14px', background: 'none',
-                      border: '1px solid rgba(255,255,255,0.05)',
-                      color: 'rgba(255,255,255,0.2)', borderRadius: '14px',
-                      fontSize: '13px', cursor: 'pointer',
-                    }}>再想想</button>
-                    <button onClick={handleEnter} style={{
-                      flex: 2, padding: '14px',
-                      background: selectedChar.theme?.btnBg || 'linear-gradient(135deg, rgba(60,120,255,0.25), rgba(40,80,220,0.35))',
-                      border: `1px solid ${selectedChar.theme?.btnBorder || 'rgba(80,160,255,0.35)'}`,
-                      color: selectedChar.theme?.btnColor || 'rgba(180,220,255,0.9)',
-                      borderRadius: '14px', fontSize: '13px', cursor: 'pointer',
-                      fontFamily: 'Georgia, serif', letterSpacing: '0.12em',
-                      boxShadow: selectedChar.theme?.btnShadow,
-                      textShadow: `0 0 10px rgba(${selectedChar.theme?.accent || '100,180,255'},0.6)`,
-                    }}>呼唤他</button>
+                    <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: '14px', background: 'none', border: '1px solid rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.2)', borderRadius: '14px', fontSize: '13px', cursor: 'pointer' }}>再想想</button>
+                                        <button onClick={handleEnter} style={{ flex: 2, padding: '14px', background: selectedChar.theme?.btnBg || 'linear-gradient(135deg, rgba(60,120,255,0.25), rgba(40,80,220,0.35))', border: `1px solid ${selectedChar.theme?.btnBorder || 'rgba(80,160,255,0.35)'}`, color: selectedChar.theme?.btnColor || 'rgba(180,220,255,0.9)', borderRadius: '14px', fontSize: '13px', cursor: 'pointer', fontFamily: 'Georgia, serif', letterSpacing: '0.12em', boxShadow: selectedChar.theme?.btnShadow, textShadow: `0 0 10px rgba(${selectedChar.theme?.accent || '100,180,255'},0.6)` }}>呼唤他</button>
                   </div>
                 </div>
               </div>
@@ -569,10 +419,12 @@ export default function Lobby() {
           onClose={() => {
             setShowSettings(false)
             const cfg = loadApiConfig()
-            if (cfg?.apiKey) {
-              const id = localStorage.getItem('selectedCharId')
-              if (id === 'custom' && localStorage.getItem('selectedCustomCharId')) router.push('/game')
-              else if (id && id !== 'custom') router.push('/game')
+            if (cfg?.apiKey && selectedChar) {
+              if (selectedChar.theme) {
+                localStorage.setItem('selectedCharId', selectedChar.id)
+                localStorage.setItem('selectedCharTheme', JSON.stringify(selectedChar.theme))
+              }
+              router.push('/game')
             }
           }}
         />
@@ -580,8 +432,17 @@ export default function Lobby() {
         <CharacterCreator
           show={showCreator}
           userId={userId}
-          onClose={() => { setShowCreator(false); loadCustomChars() }}
-          onComplete={() => { setShowCreator(false); loadCustomChars() }}
+          onClose={() => {
+            setShowCreator(false)
+            loadCustomChars()  // 刷新列表
+          }}
+          onComplete={(config) => {
+            setShowCreator(false)
+            loadCustomChars()  // 刷新列表
+            const cfg = loadApiConfig()
+            if (!cfg?.apiKey) setShowSettings(true)
+            else router.push('/game')
+          }}
         />
       </div>
     </>

@@ -281,35 +281,54 @@ const [cart, setCart] = useState([])
       setUser(session.user)
       setUserId(session.user.id)
       
-            // 检查是否选了自定义角色
-            const selectedCharId = localStorage.getItem('selectedCharId')
-            if (selectedCharId === 'custom') {
-              const customChar = await loadCustomCharacter(supabase, session.user.id, 'custom')
-              if (customChar) {
-                CHARACTER_CONFIG = {
-                  ...CHARACTER_CONFIG,
-                  id: customChar.id || 'custom',
-                  name: customChar.name || '他',
-                  englishName: customChar.englishName || '',
-                  images: {
-                    default: customChar.images?.default || '/assets/characters/lu_default.png',
-                    shy: customChar.images?.shy || customChar.images?.default || '/assets/characters/lu_default.png',
-                    intense: customChar.images?.intense || customChar.images?.default || '/assets/characters/lu_default.png',
-                    aftercare: customChar.images?.aftercare || customChar.images?.default || '/assets/characters/lu_default.png',
-                  },
-                  background: customChar.background || CHARACTER_CONFIG.background,
-                  personality: customChar.personality || CHARACTER_CONFIG.personality,
-                  speechStyle: customChar.speechStyle || CHARACTER_CONFIG.speechStyle,
-                  intimacyDesc: customChar.intimacyDesc?.length > 0 ? customChar.intimacyDesc : CHARACTER_CONFIG.intimacyDesc,
-                  diaryPrompt: customChar.diaryPrompt || CHARACTER_CONFIG.diaryPrompt,
-                  intimatePrefix: customChar.intimatePrefix || CHARACTER_CONFIG.intimatePrefix,
-                }
-                console.log('[CHAR] 加载自定义角色:', CHARACTER_CONFIG.name)
-              }
-            }
-      const { data } = await supabase
-        .from('game_saves').select('*')
-        .eq('user_id', session.user.id).single()
+// 检查是否选了自定义角色
+const selectedCharId = localStorage.getItem('selectedCharId')
+if (selectedCharId === 'custom') {
+  const customCharId = localStorage.getItem('selectedCustomCharId')
+  if (customCharId) {
+    const customChar = await loadCustomCharacter(supabase, session.user.id, customCharId)
+    if (customChar) {
+      CHARACTER_CONFIG = {
+        ...CHARACTER_CONFIG,
+        id: customChar.id || 'custom',
+        name: customChar.name || '他',
+        englishName: customChar.englishName || '',
+        images: {
+          default: customChar.images?.default || '/assets/characters/lu_default.png',
+          shy: customChar.images?.shy || customChar.images?.default || '/assets/characters/lu_default.png',
+          intense: customChar.images?.intense || customChar.images?.default || '/assets/characters/lu_default.png',
+          aftercare: customChar.images?.aftercare || customChar.images?.default || '/assets/characters/lu_default.png',
+        },
+        background: customChar.background || CHARACTER_CONFIG.background,
+        personality: customChar.personality || CHARACTER_CONFIG.personality,
+        speechStyle: customChar.speechStyle || CHARACTER_CONFIG.speechStyle,
+        intimacyDesc: customChar.intimacyDesc?.length > 0 ? customChar.intimacyDesc : CHARACTER_CONFIG.intimacyDesc,
+        diaryPrompt: customChar.diaryPrompt || CHARACTER_CONFIG.diaryPrompt,
+        intimatePrefix: customChar.intimatePrefix || CHARACTER_CONFIG.intimatePrefix,
+      }
+      console.log('[CHAR] 加载自定义角色:', CHARACTER_CONFIG.name)
+    }
+  } else {
+    console.warn('[CHAR] 没有找到自定义角色ID')
+  }
+}
+      // 获取当前角色ID
+// 获取当前角色ID（用于存档区分）
+const getCurrentCharIdForSave = () => {
+  const selectedId = localStorage.getItem('selectedCharId')
+  if (selectedId === 'custom') {
+    return localStorage.getItem('selectedCustomCharId') || 'custom_unknown'
+  }
+  return 'lu'
+}
+
+const currentCharId = getCurrentCharIdForSave()
+const { data } = await supabase
+  .from('game_saves').select('*')
+  .eq('user_id', session.user.id)
+  .eq('character_id', currentCharId)
+  .single()
+
       const isReturningUser = data && data.chat_history && data.chat_history.length > 0
       if (isReturningUser) {
         setIntimacy(data.intimacy || 0)
@@ -393,15 +412,23 @@ const [cart, setCart] = useState([])
         }
 
       } else {
-        await supabase.from('game_saves').upsert(
-          { user_id: session.user.id },
-          { onConflict: 'user_id', ignoreDuplicates: true }
-        )
-        setInitialized(true)
-        setTimeout(() => {
-          sendToAI('（她第一次回到客厅，你主动开口，一句话，自然克制）', [], 0, 'living_room', 'living_room', true)
-        }, 400)
-      }
+  const getCurrentCharIdForSave = () => {
+    const selectedId = localStorage.getItem('selectedCharId')
+    if (selectedId === 'custom') {
+      return localStorage.getItem('selectedCustomCharId') || 'custom_unknown'
+    }
+    return 'lu'
+  }
+  const newCharId = getCurrentCharIdForSave()
+  await supabase.from('game_saves').upsert(
+    { user_id: session.user.id, character_id: newCharId },
+    { onConflict: 'user_id, character_id', ignoreDuplicates: true }
+  )
+  setInitialized(true)
+  setTimeout(() => {
+    sendToAI('（她第一次回到客厅，你主动开口，一句话，自然克制）', [], 0, 'living_room', 'living_room', true)
+  }, 400)
+}
     })
   }, [])
 
@@ -435,8 +462,19 @@ async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
   const id = uid || userId
   if (!id) { console.warn('[SAVE] 没有 userId，跳过存档'); return }
   
+  // 获取当前角色ID
+  const getCurrentCharIdForSave = () => {
+    const selectedId = localStorage.getItem('selectedCharId')
+    if (selectedId === 'custom') {
+      return localStorage.getItem('selectedCustomCharId') || 'custom_unknown'
+    }
+    return 'lu'
+  }
+  const characterId = getCurrentCharIdForSave()
+  
   const payload = {
     user_id: id,
+    character_id: characterId,
     chat_history: msgs.slice(-30),
     intimacy: intim,
     current_room: pRoom,
@@ -444,40 +482,35 @@ async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
     romantic: rom ?? romantic,
     total_wk: wk ?? totalWk,
     memory_summary: memoryBlock,
-      // T1 新增
-      game_day: gameDay,
-      season: season,
-      weather: weather,
-      temp: temp,
-      sick_who: sickWho,
-      period_days: periodDays,
-      is_period: isPeriodNow,
-      diary_list: diaryList,
-      fridge: fridge,
-      book_list: bookList,
-      candle_lit: candleLit,
-      wardrobe: wardrobe,
-      current_outfit: currentOutfit,
-      bedside_items: bedsideItems,
-      coins: coins,
-      last_date: lastDate,
-      garden: garden,
-      pet: pet,
-      //
+    game_day: gameDay,
+    season: season,
+    weather: weather,
+    temp: temp,
+    sick_who: sickWho,
+    period_days: periodDays,
+    is_period: isPeriodNow,
+    diary_list: diaryList,
+    fridge: fridge,
+    book_list: bookList,
+    candle_lit: candleLit,
+    wardrobe: wardrobe,
+    current_outfit: currentOutfit,
+    bedside_items: bedsideItems,
+    coins: coins,
+    last_date: lastDate,
+    garden: garden,
+    pet: pet,
     updated_at: new Date().toISOString(),
   }
   
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('game_saves')
-    .upsert(payload, { onConflict: 'user_id' })
-    .select()  // 加 .select() 让 supabase 返回写入的数据
+    .upsert(payload, { onConflict: 'user_id, character_id' })
   
   if (error) {
-    console.error('[SAVE] 存档失败:', error.message, error.details, error.hint)
-    // 可以加个 toast 让用户知道
-    // setToast('存档失败: ' + error.message)
+    console.error('[SAVE] 存档失败:', error.message)
   } else {
-    console.log('[SAVE] 存档成功, intimacy:', intim, 'msgs:', msgs.length)
+    console.log('[SAVE] 存档成功, intimacy:', intim)
   }
 }
 
