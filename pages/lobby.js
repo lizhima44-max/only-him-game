@@ -188,16 +188,58 @@ async function handleEnter() {
     setShowSettings(true)
     return
   }
-  if (selectedChar?.theme) {
-    // 关键修复：自定义角色存 'custom'，预设角色存自己的 id
-    if (selectedChar.isCustom) {
-      localStorage.setItem('selectedCharId', 'custom')
-      localStorage.setItem('selectedCustomCharId', selectedChar.id)
+  
+  // 👇 如果是自定义角色，检查是否需要确认称呼
+  let finalSelectedChar = selectedChar
+  if (selectedChar?.isCustom && selectedChar.customData) {
+    // 检查是否已经确认过称呼（可以用一个标记，或者简单判断每次进入都问）
+    const storedNickname = localStorage.getItem(`nickname_${selectedChar.id}`)
+    
+    if (!storedNickname) {
+      // 弹窗让用户确认/修改称呼
+      const currentNickname = selectedChar.customData.playerNickname || '你'
+      const newNickname = prompt(`他应该怎么称呼你？\n\n当前：${currentNickname}\n\n（可以修改，比如：你、她、姐姐、宝贝...）`, currentNickname)
+      
+      if (newNickname !== null && newNickname.trim()) {
+        // 保存到 localStorage 标记已确认
+        localStorage.setItem(`nickname_${selectedChar.id}`, newNickname)
+        // 同时更新 selectedChar 对象
+        finalSelectedChar = {
+          ...selectedChar,
+          customData: {
+            ...selectedChar.customData,
+            playerNickname: newNickname,
+          }
+        }
+        // 可选：保存到数据库
+         await saveCustomCharacter(supabase, userId, finalSelectedChar.customData)
+      }
     } else {
-      localStorage.setItem('selectedCharId', selectedChar.id)
+      // 已经有存的称呼，使用它
+      finalSelectedChar = {
+        ...selectedChar,
+        customData: {
+          ...selectedChar.customData,
+          playerNickname: storedNickname,
+        }
+      }
+    }
+  }
+  
+  if (finalSelectedChar?.theme) {
+    // 关键修复：自定义角色存 'custom'，预设角色存自己的 id
+    if (finalSelectedChar.isCustom) {
+      localStorage.setItem('selectedCharId', 'custom')
+      localStorage.setItem('selectedCustomCharId', finalSelectedChar.id)
+      // 同时存一下称呼，供 game.js 使用
+      if (finalSelectedChar.customData?.playerNickname) {
+        localStorage.setItem(`playerNickname_${finalSelectedChar.id}`, finalSelectedChar.customData.playerNickname)
+      }
+    } else {
+      localStorage.setItem('selectedCharId', finalSelectedChar.id)
       localStorage.removeItem('selectedCustomCharId')
     }
-    localStorage.setItem('selectedCharTheme', JSON.stringify(selectedChar.theme))
+    localStorage.setItem('selectedCharTheme', JSON.stringify(finalSelectedChar.theme))
   }
   setShowModal(false)
   router.push('/game')

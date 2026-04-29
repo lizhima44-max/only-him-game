@@ -9,7 +9,7 @@
    import { SUPERMARKET_ITEMS, SHOP_CATEGORIES, HER_OUTFITS, GIFTS, getShopItems,
          PETS, createPet, updatePetDaily, feedPet, bathePet, strokePet,
          getPetContextPrompt, getPetRandomAct } from '../lib/shopAndPet'     
-   import { loadCustomCharacter } from '../lib/characterImport'   
+   import { loadCustomCharacter, loadCharacterMemories } from '../lib/characterImport'
 
 const ROOMS = [
   { id: 'living_room', name: '客厅',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
@@ -60,6 +60,7 @@ let CHARACTER_CONFIG = {
   id: 'lu_shaohuan',
   name: '陆绍桓',
   englishName: 'Lucas Lu',
+  playerNickname: '你',  // 👈 加这一行，默认用"你"
   images: {
     default:   '/assets/characters/lu_default.png',
     shy:       '/assets/characters/lu_shy.png',
@@ -151,6 +152,7 @@ function getIntimatePrompt(action, pos, mProg, cProg, rhythm, isBath) {
 export default function Game() {
   function getSystemPrompt(intimacy, playerRoom, luRoom, outsidePlace, gameDay, season, weather, temp, isPeriodNow, sickWho) {
   const C = CHARACTER_CONFIG
+  const playerNickname = C.playerNickname || '她'  // 👈 获取称呼
   const sameRoom = playerRoom === luRoom
   const isOutside = playerRoom === 'outside'
   const room = ROOMS.find(r => r.id === playerRoom)
@@ -163,7 +165,7 @@ export default function Game() {
     ? `【当前位置】你们一起在${place?.name || '外面'}。描述这个现代场所里发生的互动。`
     : sameRoom
     ? `【当前位置】你们都在她家的${room?.name}。房间里有：${room?.items}。只能描述这个房间里发生的事。`
-    : `【当前位置】她在${room?.name}（有：${room?.items}），你在${luRoomData?.name}（有：${luRoomData?.items}）。隔空说话，带点克制的思念。`
+    : `【当前位置】${playerNickname}在${room?.name}（有：${room?.items}），你在${luRoomData?.name}（有：${luRoomData?.items}）。隔空说话，带点克制的思念。`
 
   const freeRooms = ROOMS.filter(r => r.luCanFreely).map(r => r.name).join('、')
   const lockedRooms = ROOMS.filter(r => !r.luCanFreely).map(r => `${r.name}(需好感${r.unlockAt})`).join('、')
@@ -199,6 +201,8 @@ export default function Game() {
   const [showAddPrank, setShowAddPrank] = useState(false)
   const [newPrankText, setNewPrankText] = useState('')
   const [superTab, setSuperTab] = useState('staple')
+  const [importantMemories, setImportantMemories] = useState([])
+const [showMemories, setShowMemories] = useState(false)
   const bottomRef = useRef(null)
 
 
@@ -307,6 +311,15 @@ if (selectedCharId === 'custom') {
         intimatePrefix: customChar.intimatePrefix || CHARACTER_CONFIG.intimatePrefix,
       }
       console.log('[CHAR] 加载自定义角色:', CHARACTER_CONFIG.name)
+      // 读取保存的称呼
+const savedNickname = localStorage.getItem(`playerNickname_${customCharId}`)
+if (savedNickname) {
+  CHARACTER_CONFIG.playerNickname = savedNickname
+}
+      // 👇 新增：加载重要回忆
+      const memories = await loadCharacterMemories(supabase, session.user.id, customCharId)
+      setImportantMemories(memories)
+      console.log('[MEMORY] 加载重要回忆:', memories.length)
     }
   } else {
     console.warn('[CHAR] 没有找到自定义角色ID')
@@ -1240,6 +1253,7 @@ setCoins(prev => prev + 50)
                     { label: '看书', special: 'books' },
                     { label: '打扰他', prompt: '她故意进书房打扰你，你的反应，一句话' },
                     { label: '他的日记', special: 'diary' },
+                    { label: '📖 重要回忆', special: 'memories' },  // 👈 加这一行
                   ],
                   balcony: [
                     { label: '看星星', prompt: '她在阳台看星星，你跟出来了，说一句' },
@@ -1291,6 +1305,17 @@ setCoins(prev => prev + 50)
                       if (a.special === 'diary') return (
                         <button key="diary" onClick={() => setShowDiary(true)} style={btnStyle()}>他的日记</button>
                       )
+// 👇 加这一段
+if (a.special === 'memories') return (
+  <button key="memories" onClick={() => setShowMemories(true)} style={btnStyle()}>
+    📖 重要回忆
+    {importantMemories.length > 0 && (
+      <span style={{ marginLeft: '4px', fontSize: '9px', color: 'rgba(201,169,110,0.6)' }}>
+        ({importantMemories.length})
+      </span>
+    )}
+  </button>
+)
                       if (a.special === 'wardrobe') return (
                         <button key="wardrobe" onClick={() => setShowWardrobe(true)} style={btnStyle()}>衣帽间</button>
                       )
@@ -2081,6 +2106,83 @@ setCoins(prev => prev + 50)
           </div>
         </div>
       )}
+
+      {/* ══ 重要回忆弹窗 ══ */}
+{showMemories && (
+  <div onClick={() => setShowMemories(false)} style={{
+    position: 'fixed', inset: 0, zIndex: 250,
+    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+  }}>
+    <div onClick={e => e.stopPropagation()} style={{
+      width: '100%', maxWidth: '480px',
+      background: 'rgba(10,7,4,0.97)',
+      border: '1px solid rgba(201,169,110,0.12)',
+      borderRadius: '20px 20px 0 0',
+      padding: '20px 20px 44px',
+      maxHeight: '75vh',
+      overflowY: 'auto',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>📖 重要回忆</div>
+        <button onClick={() => setShowMemories(false)} style={{
+          background: 'none', border: 'none',
+          color: 'rgba(255,255,255,0.3)', fontSize: '18px', cursor: 'pointer'
+        }}>✕</button>
+      </div>
+
+      {importantMemories.length === 0 ? (
+        <div style={{
+          textAlign: 'center', padding: '40px 20px',
+          color: 'rgba(201,169,110,0.3)', fontSize: '12px', lineHeight: 1.8
+        }}>
+          💭 还没有重要回忆<br/>
+          <span style={{ fontSize: '10px', opacity: 0.6 }}>和他创造更多故事吧</span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {importantMemories.map((memory, idx) => (
+            <div key={idx} style={{
+              padding: '14px',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(201,169,110,0.1)',
+              borderRadius: '12px',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
+              }}>
+                <div style={{
+                  fontSize: '14px',
+                  color: '#c9a96e',
+                  fontWeight: 'bold',
+                  letterSpacing: '0.05em'
+                }}>
+                  {memory.title}
+                </div>
+                <div style={{
+                  fontSize: '10px',
+                  color: 'rgba(201,169,110,0.4)'
+                }}>
+                  {'❤️'.repeat(memory.importance)}
+                </div>
+              </div>
+              <div style={{
+                fontSize: '12px',
+                color: 'rgba(220,235,255,0.6)',
+                lineHeight: 1.7
+              }}>
+                {memory.description}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+)}
 {/* ══ 日历弹窗 ══ */}
         {showCalendar && (() => {
     const gd = realDate()

@@ -4,7 +4,6 @@
 // ══════════════════════════════════════════════════════
 import { useState, useRef } from 'react'
 import { callAI, loadApiConfig } from '../lib/apiClient'
-import { fillDefaults, saveCustomCharacter } from '../lib/characterImport'
 import { supabase } from '../lib/supabase'
 import { fillDefaults, saveCustomCharacter, saveCharacterMemories } from '../lib/characterImport'
 
@@ -28,6 +27,7 @@ export default function CharacterCreator({ show, onClose, userId, onComplete }) 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef(null)
+  const [playerNickname, setPlayerNickname] = useState('')
 
   if (!show) return null
 
@@ -152,6 +152,7 @@ ${textToAnalyze}
 
 {
   "name": "角色名字（从对话中推断）",
+  "playerNickname": "他对女主的称呼（从对话中提取，如'你'、'她'、'姐姐'、'宝贝'等，如果没有则留空）",
   "background": "根据对话推断的背景设定，2-3句，要具体",
   "personality": "性格描述，要具体到行为模式，如'表面冷漠但会偷看她'",
   "speechStyle": "说话风格，引用具体例子，如'简短有力，常说「嗯」「过来」'",
@@ -166,9 +167,10 @@ ${textToAnalyze}
 }
 
 要求：
-1. intimacyLevel 根据对话中两人的亲密度判断（刚认识=10-20，开始熟悉=30-40，牵手拥抱=50-60，亲吻=70-80，亲密关系=90+）
-2. importantMemories 提取至少2-3个这段对话中的关键事件/经典时刻/重要转折
-3. 所有描述基于对话实际内容，对话中没有的信息不要编造`
+1. playerNickname 从对话中找出他对女主的称呼
+2. intimacyLevel 根据对话中两人的亲密度判断（刚认识=10-20，开始熟悉=30-40，牵手拥抱=50-60，亲吻=70-80，亲密关系=90+）
+3. importantMemories 提取至少2-3个这段对话中的关键事件/经典时刻/重要转折
+4. 所有描述基于对话实际内容，对话中没有的信息不要编造`
       
       const reply = await callAI(
         '你是角色分析专家，仔细阅读全部对话后生成角色配置，只输出纯JSON。',
@@ -397,6 +399,14 @@ async function handleSaveAnalyzed() {
             {/* Step 2: 灵魂（性格标签 + 背景） */}
             {step >= 2 && (
               <div style={{ marginBottom: '22px', animation: 'fadeIn 0.5s ease' }}>
+                 {/* 👇 新增：他怎么称呼你 */}
+    <div style={{ ...sectionHint, marginTop: '14px' }}>他怎么称呼你？</div>
+    <input
+      value={playerNickname}
+      onChange={e => setPlayerNickname(e.target.value)}
+      placeholder="例如：你、她、姐姐、宝贝..."
+      style={inputStyle}
+    />
                 <div style={sectionTitle}>他的灵魂是什么样的？</div>
                 <div style={sectionHint}>最多选5个，定义他的性格</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
@@ -567,6 +577,41 @@ async function handleSaveAnalyzed() {
           )}
 
           <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.5)', lineHeight: 1.9, marginBottom: '8px' }}>{analyzed.background}</div>
+          {/* 👇 新增：称呼显示 + 修改按钮 */}
+<div style={{ 
+  fontSize: '12px', 
+  color: 'rgba(200,220,255,0.6)', 
+  lineHeight: 1.9, 
+  marginBottom: '8px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  flexWrap: 'wrap'
+}}>
+  <span>
+    <span style={{ color: '#c9a96e' }}>他叫你：</span> 
+    <span style={{ fontStyle: 'italic' }}>{analyzed.playerNickname || '你'}</span>
+  </span>
+  <button 
+    onClick={() => {
+      const newName = prompt('他怎么称呼你？', analyzed.playerNickname || '你')
+      if (newName && newName.trim()) {
+        setAnalyzed({...analyzed, playerNickname: newName.trim()})
+      }
+    }}
+    style={{
+      fontSize: '10px',
+      background: 'rgba(201,169,110,0.1)',
+      border: '1px solid rgba(201,169,110,0.2)',
+      borderRadius: '14px',
+      color: 'rgba(201,169,110,0.6)',
+      cursor: 'pointer',
+      padding: '2px 10px',
+      fontFamily: 'Georgia, serif',
+    }}
+  >修改</button>
+</div>
+{/* 👆 新增结束 */}
           <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.35)', fontStyle: 'italic' }}>"{analyzed.speechStyle}"</div>
         </div>
 
