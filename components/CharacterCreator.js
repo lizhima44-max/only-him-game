@@ -28,6 +28,8 @@ export default function CharacterCreator({ show, onClose, userId, onComplete }) 
   const [error, setError] = useState('')
   const fileRef = useRef(null)
   const [playerNickname, setPlayerNickname] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+const avatarInputRef = useRef(null)
 
   if (!show) return null
 
@@ -66,6 +68,25 @@ export default function CharacterCreator({ show, onClose, userId, onComplete }) 
     else if (tags.length < 5) setTags([...tags, tagId])
   }
 
+  async function handleAvatarChange(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  
+  if (!file.type.startsWith('image/')) {
+    setError('请上传图片文件')
+    return
+  }
+  
+  setError('')
+  
+  // 转为 base64 存储（简单方案，不用 Supabase Storage）
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    setAvatarUrl(ev.target.result)
+  }
+  reader.readAsDataURL(file)
+}
+
   // ── 捏人完成 → 生成config ──
   async function handleCraftComplete() {
     if (!name.trim()) { setError('给他起个名字吧'); return }
@@ -89,12 +110,20 @@ export default function CharacterCreator({ show, onClose, userId, onComplete }) 
         { upTo: 40, text: `他开始${tags.includes('tsundere') ? '嘴硬心软' : tags.includes('shy') ? '不自觉脸红' : '找理由靠近她'}。` },
         { upTo: 70, text: `他${tags.includes('possessive') ? '占有欲开始外露' : tags.includes('gentle') ? '温柔得让人心疼' : '不再掩饰在意'}。` },
         { upTo: 999, text: `他${tags.includes('dom') ? '霸道又温柔，眼里只有她' : tags.includes('clingy') ? '每时每刻都想黏着她' : '完全沦陷，不再克制'}。` },
+        
       ],
+      playerNickname: playerNickname.trim() || '你',  // 👈 加这行
+  images: {                    // 👈 加上整个 images 对象
+    default: avatarUrl || '',
+    shy: '',
+    intense: '',
+    aftercare: '',
+  },
     })
 
   const result = await saveCustomCharacter(supabase, userId, {
   ...config,
-  customId: `craft_${Date.now()}_${config.name}`
+  customId: `craft_${Date.now()}`
 })
 
 setSaving(false)
@@ -108,6 +137,11 @@ if (result.success) {
   }
 
 async function handleAnalyze() {
+if (wasTruncated) {
+  console.log(`⚠️ 文本已被截断，丢失 ${textLength - MAX_SIZE} 字符`)
+}
+console.log('═══════════════════════════════════════════════════════')
+
   if (!chatText.trim()) { setError('请粘贴或上传聊天记录'); return }
   const apiConfig = loadApiConfig()
   if (!apiConfig?.apiKey) { setError('需要先配置API Key'); return }
@@ -133,7 +167,11 @@ async function handleAnalyze() {
       wasTruncated = true
       setError(`⚠️ 对话过长，${isDeepSeek ? '已截取前800KB' : '已截取前50KB'}。${isDeepSeek ? '如需更完整分析，请缩短到800KB以内' : '建议使用DeepSeek API获得更长上下文'}`)
     }
-    
+    console.log('═══════════════════════════════════════════════════════')
+console.log('🔍 [AI分析请求]')
+console.log(`📄 原始文本长度: ${textLength} 字符`)
+console.log(`📏 实际分析长度: ${textToAnalyze.length} 字符`)
+console.log(`🤖 使用模型: ${isDeepSeek ? 'DeepSeek（长上下文）' : '其他模型（分块模式）'}`)
     console.log(`[分析] 模型: ${apiConfig.provider}, 长上下文: ${isDeepSeek}, 文本长度: ${textLength}, 实际分析: ${textToAnalyze.length}`)
 
     // 根据模型选择不同策略
@@ -178,7 +216,30 @@ ${textToAnalyze}
         { ...apiConfig, maxTokens: 1500 }
       )
       
-      finalConfig = extractJSON(reply)
+      const finalConfig = extractJSON(reply)  // 用 const 声明
+      // 👇 日志放这里
+console.log('═══════════════════════════════════════════════════════')
+console.log('📊 [好感度分析报告]')
+console.log('═══════════════════════════════════════════════════════')
+console.log(`👤 角色名称: ${finalConfig.name || '未识别'}`)
+console.log(`💬 他对你的称呼: ${finalConfig.playerNickname || '未识别（默认"你"）'}`)
+console.log(`❤️  初始好感度: ${finalConfig.intimacyLevel !== undefined ? finalConfig.intimacyLevel + '/100' : '未分析'}`)
+console.log('')
+console.log('📖 重要回忆（共 ' + (finalConfig.importantMemories?.length || 0) + ' 条）:')
+if (finalConfig.importantMemories && finalConfig.importantMemories.length > 0) {
+  finalConfig.importantMemories.forEach((mem, idx) => {
+    console.log(`  ${idx+1}. 【${mem.title}】❤️${mem.importance || 3}/5`)
+    console.log(`     描述: ${mem.desc || mem.description || '无'}`)
+  })
+} else {
+  console.log('  无')
+}
+console.log('')
+console.log('🎭 性格标签:', finalConfig.tags?.join(', ') || '未识别')
+console.log('📝 说话风格:', finalConfig.speechStyle || '未识别')
+console.log('🏷️  一句话人设:', finalConfig.tagline || '未识别')
+console.log('═══════════════════════════════════════════════════════')
+
       
     } else {
       // 其他模型：分块分析 + 汇总
@@ -263,6 +324,12 @@ ${JSON.stringify(allFeatures, null, 2)}
       
       finalConfig = extractJSON(finalReply)
     }
+    // 分析完成后打印好感度报告
+    console.log('═══════════════════════════════════════════════════════')
+    console.log('📊 [好感度分析报告]')
+    console.log('═══════════════════════════════════════════════════════')
+    console.log(`👤 角色名称: ${finalConfig.name || '未识别'}`)
+    console.log(`❤️  初始好感度: ${finalConfig.intimacyLevel !== undefined ? finalConfig.intimacyLevel + '/100' : '未分析'}`)
     
     // 填充默认值并显示
     setAnalyzed(fillDefaults(finalConfig))
@@ -300,7 +367,7 @@ async function handleSaveAnalyzed() {
   // 保存角色
   const result = await saveCustomCharacter(supabase, userId, {
     ...analyzed,
-    customId: `ai_${Date.now()}_${analyzed.name}`
+    customId: `craft_${Date.now()}`
   })
   
   if (result.success) {
@@ -460,40 +527,97 @@ async function handleSaveAnalyzed() {
               </div>
             )}
 
-            {/* Step 4: 预览确认 */}
-            {step >= 4 && (
-              <div style={{ marginBottom: '10px', animation: 'fadeIn 0.5s ease' }}>
-                <div style={{ ...sectionTitle, marginBottom: '12px' }}>他来了。</div>
-                <div style={{
-                  padding: '16px', background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(140,190,255,0.12)', borderRadius: '14px',
-                  marginBottom: '16px',
-                }}>
-                  <div style={{ fontSize: '18px', color: 'rgba(220,235,255,0.95)', fontStyle: 'italic', marginBottom: '6px',
-                    textShadow: '0 0 12px rgba(80,160,255,0.4)' }}>{name}</div>
-                  <div style={{ fontSize: '10px', color: 'rgba(180,210,255,0.4)', marginBottom: '10px' }}>
-                    {tags.map(id => TAG_POOL.find(t => t.id === id)?.label).filter(Boolean).join(' · ')}
-                  </div>
-                  {bgText && <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.5)', lineHeight: 1.8, marginBottom: '6px' }}>{bgText}</div>}
-                  <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.35)', fontStyle: 'italic' }}>
-                    {SPEECH_STYLES.find(s => s.id === speechStyle)?.desc}
-                  </div>
-                </div>
+{/* Step 4: 预览确认 */}
+{step >= 4 && (
+  <div style={{ marginBottom: '10px', animation: 'fadeIn 0.5s ease' }}>
+    <div style={{ ...sectionTitle, marginBottom: '12px' }}>他来了。</div>
+    
+    {/* 图片上传区域 */}
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      marginBottom: '16px',
+      padding: '12px',
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid rgba(140,190,255,0.1)',
+      borderRadius: '14px',
+    }}>
+      {/* 头像预览 */}
+      <div style={{
+        width: '60px',
+        height: '60px',
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(201,169,110,0.2)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+      }}>
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="头像" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <span style={{ fontSize: '20px', color: 'rgba(201,169,110,0.3)' }}>?</span>
+        )}
+      </div>
+      
+      <div style={{ flex: 1 }}>
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          onChange={handleAvatarChange}
+          style={{ display: 'none' }}
+        />
+        <button onClick={() => avatarInputRef.current?.click()} style={{
+          padding: '8px 16px',
+          background: 'rgba(140,190,255,0.08)',
+          border: '1px solid rgba(140,190,255,0.2)',
+          borderRadius: '20px',
+          color: 'rgba(200,225,255,0.8)',
+          fontSize: '11px',
+          cursor: 'pointer',
+          fontFamily: 'Georgia, serif',
+        }}>
+          {avatarUrl ? '更换头像' : '上传头像'}
+        </button>
+        <div style={{ fontSize: '9px', color: 'rgba(201,169,110,0.3)', marginTop: '4px' }}>
+          支持 JPG/PNG，建议正方形图片
+        </div>
+      </div>
+    </div>
 
-                <button onClick={handleCraftComplete} disabled={saving} style={{
-                  width: '100%', padding: '14px',
-                  background: saving ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, rgba(80,140,255,0.3), rgba(120,80,255,0.25))',
-                  border: '1px solid rgba(140,180,255,0.3)', borderRadius: '14px',
-                  cursor: saving ? 'not-allowed' : 'pointer',
-                  color: saving ? 'rgba(180,210,255,0.4)' : 'rgba(230,240,255,0.95)',
-                  fontSize: '14px', letterSpacing: '0.16em', fontFamily: 'Georgia, serif',
-                  boxShadow: saving ? 'none' : '0 4px 24px rgba(80,120,255,0.2)',
-                  textShadow: saving ? 'none' : '0 0 12px rgba(100,180,255,0.5)',
-                }}>
-                  {saving ? '他正在赶来...' : '呼唤他'}
-                </button>
-              </div>
-            )}
+    <div style={{
+      padding: '16px', background: 'rgba(255,255,255,0.03)',
+      border: '1px solid rgba(140,190,255,0.12)', borderRadius: '14px',
+      marginBottom: '16px',
+    }}>
+      <div style={{ fontSize: '18px', color: 'rgba(220,235,255,0.95)', fontStyle: 'italic', marginBottom: '6px',
+        textShadow: '0 0 12px rgba(80,160,255,0.4)' }}>{name}</div>
+      <div style={{ fontSize: '10px', color: 'rgba(180,210,255,0.4)', marginBottom: '10px' }}>
+        {tags.map(id => TAG_POOL.find(t => t.id === id)?.label).filter(Boolean).join(' · ')}
+      </div>
+      {bgText && <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.5)', lineHeight: 1.8, marginBottom: '6px' }}>{bgText}</div>}
+      <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.35)', fontStyle: 'italic' }}>
+        {SPEECH_STYLES.find(s => s.id === speechStyle)?.desc}
+      </div>
+    </div>
+
+    <button onClick={handleCraftComplete} disabled={saving} style={{
+      width: '100%', padding: '14px',
+      background: saving ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, rgba(80,140,255,0.3), rgba(120,80,255,0.25))',
+      border: '1px solid rgba(140,180,255,0.3)', borderRadius: '14px',
+      cursor: saving ? 'not-allowed' : 'pointer',
+      color: saving ? 'rgba(180,210,255,0.4)' : 'rgba(230,240,255,0.95)',
+      fontSize: '14px', letterSpacing: '0.16em', fontFamily: 'Georgia, serif',
+      boxShadow: saving ? 'none' : '0 4px 24px rgba(80,120,255,0.2)',
+      textShadow: saving ? 'none' : '0 0 12px rgba(100,180,255,0.5)',
+    }}>
+      {saving ? '他正在赶来...' : '呼唤他'}
+    </button>
+  </div>
+)}
           </div>
         )}
 
