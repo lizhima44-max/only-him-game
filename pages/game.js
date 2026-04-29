@@ -204,6 +204,7 @@ export default function Game() {
   const [importantMemories, setImportantMemories] = useState([])
 const [showMemories, setShowMemories] = useState(false)
   const bottomRef = useRef(null)
+  const [charLoading, setCharLoading] = useState(true)
 
 
   // ── 亲密小游戏状态 ──
@@ -310,12 +311,39 @@ if (selectedCharId === 'custom') {
         diaryPrompt: customChar.diaryPrompt || CHARACTER_CONFIG.diaryPrompt,
         intimatePrefix: customChar.intimatePrefix || CHARACTER_CONFIG.intimatePrefix,
       }
+      setCharLoading(false)  // 👈 加载完成
+    }
+    else {
+  setCharLoading(false)  // 没有自定义角色也结束加载
+}
+
+// 渲染时判断
+if (charLoading) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: '#0f0c09',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'Georgia, serif',
+    }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: '14px', color: '#c9a96e', marginBottom: '12px' }}>正在唤醒...</div>
+        <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)' }}>{CHARACTER_CONFIG.name}</div>
+      </div>
+    </div>
+  )
+}
       console.log('[CHAR] 加载自定义角色:', CHARACTER_CONFIG.name)
       // 读取保存的称呼
 const savedNickname = localStorage.getItem(`playerNickname_${customCharId}`)
 if (savedNickname) {
   CHARACTER_CONFIG.playerNickname = savedNickname
 }
+  // 👇 加上这段：设置好感度
+  if (customChar.intimacyLevel !== undefined && customChar.intimacyLevel > 0) {
+    setIntimacy(customChar.intimacyLevel)
+    console.log('[CHAR] 设置初始好感度:', customChar.intimacyLevel)
+  }
       // 👇 新增：加载重要回忆
       const memories = await loadCharacterMemories(supabase, session.user.id, customCharId)
       setImportantMemories(memories)

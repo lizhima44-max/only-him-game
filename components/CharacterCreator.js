@@ -365,6 +365,14 @@ ${JSON.stringify(allFeatures, null, 2)}
       console.log(`🎭 性格标签: ${finalConfig.tags?.join(', ') || '未识别'}`)
       console.log('═══════════════════════════════════════════════════════')
     }
+    if (!finalConfig.importantMemories || finalConfig.importantMemories.length === 0) {
+  finalConfig.importantMemories = [
+    { title: "初次相遇", desc: "你们第一次聊天的时刻", importance: 5 },
+    { title: "感情升温", desc: "你们的关系越来越亲密", importance: 4 },
+    { title: "特别约定", desc: "你们之间的特殊约定", importance: 4 }
+  ]
+  console.log('[FIX] 补全了默认回忆')
+}
     
     setAnalyzed(fillDefaults(finalConfig))
     
@@ -396,31 +404,30 @@ function extractJSON(str) {
   // ── AI分析结果确认保存 ──
 async function handleSaveAnalyzed() {
   if (!analyzed) return
-  // 👇 加这行调试
-  console.log('[DEBUG] 完整的 analyzed 对象:', JSON.stringify(analyzed, null, 2))
-  console.log('[DEBUG] importantMemories 字段:', analyzed.importantMemories)
-  console.log('[DEBUG] important_memories 字段:', analyzed.important_memories)
+  
+  console.log('[DEBUG] 重要回忆数量:', analyzed.importantMemories?.length || 0)
+  
   setSaving(true)
   
-  // 保存角色
   const result = await saveCustomCharacter(supabase, userId, {
     ...analyzed,
-    customId: `craft_${Date.now()}`
+    customId: `ai_${Date.now()}`
   })
   
   if (result.success) {
-// 保存重要回忆
-if (analyzed.importantMemories && analyzed.importantMemories.length > 0) {
-  console.log('[MEMORY] 准备保存回忆:', analyzed.importantMemories)
-  const memoryResult = await saveCharacterMemories(supabase, userId, result.characterId, analyzed.importantMemories)
-  console.log('[MEMORY] 保存结果:', memoryResult)
-} else {
-  console.log('[MEMORY] 没有重要回忆需要保存')
-}
+    const memories = analyzed.importantMemories || []
     
-    // 可选：保存好感度到角色配置中
-    if (analyzed.intimacyLevel !== undefined) {
-      // 好感度已经在角色配置里，下次加载时会自动读取
+    if (memories.length > 0) {
+      console.log('[MEMORY] 使用 AI 分析的', memories.length, '条回忆')
+      await saveCharacterMemories(supabase, userId, result.characterId, memories)
+    } else {
+      console.log('[MEMORY] AI 未提供回忆，使用默认回忆')
+      const defaultMemories = [
+        { title: "初次相遇", desc: `你和${analyzed.name}的第一次相遇`, importance: 5 },
+        { title: "开始相处", desc: `${analyzed.name}走进了你的生活`, importance: 4 },
+        { title: "特别时刻", desc: `你们之间发生了难忘的故事`, importance: 4 }
+      ]
+      await saveCharacterMemories(supabase, userId, result.characterId, defaultMemories)
     }
     
     localStorage.setItem('selectedCharId', 'custom')
