@@ -6,6 +6,7 @@ import { useState, useRef } from 'react'
 import { callAI, loadApiConfig } from '../lib/apiClient'
 import { fillDefaults, saveCustomCharacter } from '../lib/characterImport'
 import { supabase } from '../lib/supabase'
+import { fillDefaults, saveCustomCharacter, saveCharacterMemories } from '../lib/characterImport'
 
 export default function CharacterCreator({ show, onClose, userId, onComplete }) {
   const [tab, setTab] = useState('craft')  // 'craft' | 'summon'
@@ -142,7 +143,7 @@ async function handleAnalyze() {
       // DeepSeek: 一次性全量分析
       setError('🔍 正在深度阅读你们的对话...')
       
-      const analyzePrompt = `你是一位角色分析专家。请仔细阅读以下完整的聊天记录，提取【他】的角色特征。
+const analyzePrompt = `你是一位角色分析专家。请仔细阅读以下完整的聊天记录，提取【他】的角色特征。
 
 聊天记录：
 ${textToAnalyze}
@@ -155,13 +156,19 @@ ${textToAnalyze}
   "personality": "性格描述，要具体到行为模式，如'表面冷漠但会偷看她'",
   "speechStyle": "说话风格，引用具体例子，如'简短有力，常说「嗯」「过来」'",
   "tags": ["标签1", "标签2", "标签3", "标签4", "标签5"],
-  "tagline": "一句话人设总结"
+  "tagline": "一句话人设总结",
+  "intimacyLevel": 数字(0-100)，根据对话中两人的亲密程度判断，
+  "importantMemories": [
+    { "title": "第一次相遇", "desc": "根据对话推测或提取的具体描述", "importance": 5 },
+    { "title": "重要事件2", "desc": "描述", "importance": 4 },
+    { "title": "重要事件3", "desc": "描述", "importance": 3 }
+  ]
 }
 
 要求：
-1. 基于对话实际内容，不要编造
-2. 越具体越好，引用对话中的原话
-3. 如果信息不足，合理推测但要标注`
+1. intimacyLevel 根据对话中两人的亲密度判断（刚认识=10-20，开始熟悉=30-40，牵手拥抱=50-60，亲吻=70-80，亲密关系=90+）
+2. importantMemories 提取至少2-3个这段对话中的关键事件/经典时刻/重要转折
+3. 所有描述基于对话实际内容，对话中没有的信息不要编造`
       
       const reply = await callAI(
         '你是角色分析专家，仔细阅读全部对话后生成角色配置，只输出纯JSON。',
@@ -287,20 +294,33 @@ function extractJSON(str) {
 async function handleSaveAnalyzed() {
   if (!analyzed) return
   setSaving(true)
+  
+  // 保存角色
   const result = await saveCustomCharacter(supabase, userId, {
     ...analyzed,
     customId: `ai_${Date.now()}_${analyzed.name}`
   })
-  setSaving(false)
-  // ... 后面不变
-    if (result.success) {
-      localStorage.setItem('selectedCharId', 'custom')
-      localStorage.setItem('selectedCustomCharId', result.characterId)  // ← 加上这行
-      onComplete?.(analyzed)
-    } else {
-      setError('保存失败: ' + result.error)
+  
+  if (result.success) {
+    // 👇 新增：保存重要回忆
+    if (analyzed.importantMemories && analyzed.importantMemories.length > 0) {
+      await saveCharacterMemories(supabase, userId, result.characterId, analyzed.importantMemories)
+      console.log('[MEMORY] 保存重要回忆:', analyzed.importantMemories.length)
     }
+    
+    // 可选：保存好感度到角色配置中
+    if (analyzed.intimacyLevel !== undefined) {
+      // 好感度已经在角色配置里，下次加载时会自动读取
+    }
+    
+    localStorage.setItem('selectedCharId', 'custom')
+    localStorage.setItem('selectedCustomCharId', result.characterId)
+    onComplete?.(analyzed)
+  } else {
+    setError('保存失败: ' + result.error)
   }
+  setSaving(false)
+}
 
   // ── 上传文件 ──
   function handleFile(e) {
