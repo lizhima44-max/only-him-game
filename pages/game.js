@@ -278,61 +278,15 @@ const [shopTab, setShopTab] = useState('his')
 const [petNameInput, setPetNameInput] = useState('')
 const [adoptingType, setAdoptingType] = useState(null)
 const [cart, setCart] = useState([])
-  const aiTimerRef = useRef(null)
+const aiTimerRef = useRef(null)
 
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) { router.push('/'); return }
-      setUser(session.user)
-      setUserId(session.user.id)
-      
-// 检查是否选了自定义角色
-const selectedCharId = localStorage.getItem('selectedCharId')
-if (selectedCharId === 'custom') {
-  const customCharId = localStorage.getItem('selectedCustomCharId')
-  if (customCharId) {
-    const customChar = await loadCustomCharacter(supabase, session.user.id, customCharId)
-    if (customChar) {
-      CHARACTER_CONFIG = {
-        ...CHARACTER_CONFIG,
-        id: customChar.id || 'custom',
-        name: customChar.name || '他',
-        englishName: customChar.englishName || '',
-        images: {
-          default: customChar.images?.default || '/assets/characters/lu_default.png',
-          shy: customChar.images?.shy || customChar.images?.default || '/assets/characters/lu_default.png',
-          intense: customChar.images?.intense || customChar.images?.default || '/assets/characters/lu_default.png',
-          aftercare: customChar.images?.aftercare || customChar.images?.default || '/assets/characters/lu_default.png',
-        },
-        background: customChar.background || CHARACTER_CONFIG.background,
-        personality: customChar.personality || CHARACTER_CONFIG.personality,
-        speechStyle: customChar.speechStyle || CHARACTER_CONFIG.speechStyle,
-        intimacyDesc: customChar.intimacyDesc?.length > 0 ? customChar.intimacyDesc : CHARACTER_CONFIG.intimacyDesc,
-        diaryPrompt: customChar.diaryPrompt || CHARACTER_CONFIG.diaryPrompt,
-        intimatePrefix: customChar.intimatePrefix || CHARACTER_CONFIG.intimatePrefix,
-      }
-       // 读取保存的称呼
-          const savedNickname = localStorage.getItem(`playerNickname_${customCharId}`)
-          if (savedNickname) {
-            CHARACTER_CONFIG.playerNickname = savedNickname
-          }
-          // 设置好感度
-          if (customChar.intimacyLevel !== undefined && customChar.intimacyLevel > 0) {
-            setIntimacy(customChar.intimacyLevel)
-            console.log('[CHAR] 设置初始好感度:', customChar.intimacyLevel)
-          }
-          // 加载重要回忆
-          const memories = await loadCharacterMemories(supabase, session.user.id, customCharId)
-          setImportantMemories(memories)
-          console.log('[MEMORY] 加载重要回忆:', memories.length)
-        }
-      }
-    } else {
-      console.warn('[CHAR] 没有找到自定义角色ID')
-    }
+useEffect(() => {
+  supabase.auth.getSession().then(async ({ data: { session } }) => {
+    if (!session) { router.push('/'); return }
+    setUser(session.user)
+    setUserId(session.user.id)
     
-    setCharLoading(false)  // 👈 加载完成
-// 获取当前角色ID（用于存档区分）
+    // 获取当前角色ID的函数（只定义一次）
     const getCurrentCharIdForSave = () => {
       const selectedId = localStorage.getItem('selectedCharId')
       if (selectedId === 'custom') {
@@ -341,39 +295,188 @@ if (selectedCharId === 'custom') {
       return 'lu'
     }
     
+    // 检查是否选了自定义角色
+    const selectedCharId = localStorage.getItem('selectedCharId')
+    if (selectedCharId === 'custom') {
+      const customCharId = localStorage.getItem('selectedCustomCharId')
+      if (customCharId) {
+        const customChar = await loadCustomCharacter(supabase, session.user.id, customCharId)
+        if (customChar) {
+          CHARACTER_CONFIG = {
+            ...CHARACTER_CONFIG,
+            id: customChar.id || 'custom',
+            name: customChar.name || '他',
+            englishName: customChar.englishName || '',
+            images: {
+              default: customChar.images?.default || '',
+              shy: customChar.images?.shy || customChar.images?.default || '',
+              intense: customChar.images?.intense || customChar.images?.default || '',
+              aftercare: customChar.images?.aftercare || customChar.images?.default || '',
+            },
+            background: customChar.background || CHARACTER_CONFIG.background,
+            personality: customChar.personality || CHARACTER_CONFIG.personality,
+            speechStyle: customChar.speechStyle || CHARACTER_CONFIG.speechStyle,
+            intimacyDesc: customChar.intimacyDesc?.length > 0 ? customChar.intimacyDesc : CHARACTER_CONFIG.intimacyDesc,
+            diaryPrompt: customChar.diaryPrompt || CHARACTER_CONFIG.diaryPrompt,
+            intimatePrefix: customChar.intimatePrefix || CHARACTER_CONFIG.intimatePrefix,
+            playerNickname: customChar.playerNickname || '你',
+          }
+          
+          // 读取保存的称呼
+          const savedNickname = localStorage.getItem(`playerNickname_${customCharId}`)
+          if (savedNickname) {
+            CHARACTER_CONFIG.playerNickname = savedNickname
+          }
+          
+          // 设置好感度
+          if (customChar.intimacyLevel !== undefined && customChar.intimacyLevel > 0) {
+            setIntimacy(customChar.intimacyLevel)
+            console.log('[CHAR] 设置初始好感度:', customChar.intimacyLevel)
+          }
+          
+          // 加载重要回忆
+          const memories = await loadCharacterMemories(supabase, session.user.id, customCharId)
+          setImportantMemories(memories)
+          console.log('[MEMORY] 加载重要回忆:', memories.length)
+          
+          // 检查是否为新角色（没有存档）
+          const { data: existingSave } = await supabase
+            .from('game_saves')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .eq('character_id', customCharId)
+            .single()
+          
+          if (!existingSave) {
+            console.log('[CHAR] 新角色，创建初始存档，好感度:', customChar.intimacyLevel || 0)
+            await supabase.from('game_saves').insert({
+              user_id: session.user.id,
+              character_id: customCharId,
+              intimacy: customChar.intimacyLevel || 0,
+              chat_history: [],
+              current_room: 'living_room',
+              lu_location: 'guest_room',
+              romantic: 0,
+              total_wk: 0,
+              memory_summary: '',
+              game_day: 0,
+              season: 'autumn',
+              weather: 'sunny',
+              temp: 20,
+              sick_who: null,
+              period_days: [],
+              is_period: false,
+              diary_list: [],
+              fridge: defaultFridge,
+              book_list: defaultBookList,
+              candle_lit: false,
+              wardrobe: ['daily_white', 'daily_black'],
+              current_outfit: 'daily_white',
+              bedside_items: [],
+              coins: 500,
+              last_date: '',
+              garden: [],
+              pet: null,
+            })
+          }
+        } else {
+          console.warn('[CHAR] 没有找到自定义角色ID')
+        }
+      }
+    }
+    
+    // 加载存档
     const currentCharId = getCurrentCharIdForSave()
     const { data } = await supabase
-      .from('game_saves').select('*')
+      .from('game_saves')
+      .select('*')
       .eq('user_id', session.user.id)
       .eq('character_id', currentCharId)
       .single()
     
     const isReturningUser = data && data.chat_history && data.chat_history.length > 0
+    
     if (isReturningUser) {
-      // ... 原有逻辑
       setIntimacy(data.intimacy || 0)
       setPlayerRoom(data.current_room || 'living_room')
       setLuRoom(data.lu_location || 'guest_room')
-      // ... 其他设置
+      setMessages(data.chat_history)
+      setRomantic(data.romantic || 0)
+      setTotalWk(data.total_wk || 0)
+      setMemoryBlock(data.memory_summary || '')
+      setGameDay(data.game_day || 0)
+      setSeason(data.season || 'autumn')
+      setWeather(data.weather || 'sunny')
+      setTemp(data.temp || 20)
+      setSickWho(data.sick_who || null)
+      setPeriodDays(data.period_days || [])
+      setIsPeriodNow(data.is_period || false)
+      setDiaryList(data.diary_list || [])
+      setFridge(data.fridge && Object.keys(data.fridge).length > 0 ? data.fridge : defaultFridge)
+      setBookList(data.book_list?.length > 0 ? data.book_list : defaultBookList)
+      setCandleLit(data.candle_lit || false)
+      setCoins(data.coins ?? 500)
+      setLastDate(data.last_date || '')
+      setGarden(data.garden || [])
+      setPet(data.pet || null)
+      setWardrobe(data.wardrobe || ['daily_white', 'daily_black'])
+      setCurrentOutfit(data.current_outfit || 'daily_white')
+      setBedsideItems(data.bedside_items || [])
       setInitialized(true)
       
       // 自动检测新一天
       const savedDate = data.last_date || ''
       const today = todayStr()
       if (savedDate !== today) {
-        // ... 新一天逻辑
+        setTimeout(async () => {
+          const realW = await fetchRealWeather().catch(() => null)
+          const result = processNewDay({
+            day: data.game_day || 0,
+            romantic: data.romantic || 0,
+            periodDays: data.period_days || [],
+          }, realW)
+          
+          setGameDay(result.day)
+          setSeason(result.season)
+          setWeather(result.weather)
+          setTemp(result.temp)
+          setSickWho(result.sickWho)
+          setRomantic(result.romantic)
+          setCandleLit(false)
+          setIsPeriodNow(result.isPeriod)
+          setLastDate(today)
+          setCoins(prev => prev + 50)
+          
+          if (data.garden?.length > 0) {
+            const gardenResult = updateGardenDaily(data.garden, result.day, result.season)
+            setGarden(gardenResult.garden)
+          }
+          
+          if (data.pet) {
+            const updatedPet = updatePetDaily(data.pet)
+            setPet(updatedPet)
+          }
+          
+          const sysMsgs = result.events.map(e => ({ role: 'system', content: e }))
+          setMessages(prev => [...prev, ...sysMsgs])
+          setToast(result.events[0])
+          
+          await supabase.from('game_saves').update({
+            game_day: result.day, season: result.season, weather: result.weather,
+            temp: result.temp, sick_who: result.sickWho, romantic: result.romantic,
+            candle_lit: false, is_period: result.isPeriod, last_date: today,
+          }).eq('user_id', session.user.id).eq('character_id', currentCharId)
+        }, 500)
       }
     } else {
-      const newCharId = getCurrentCharIdForSave()
-      await supabase.from('game_saves').upsert(
-        { user_id: session.user.id, character_id: newCharId },
-        { onConflict: 'user_id, character_id', ignoreDuplicates: true }
-      )
+      // 没有存档，不需要创建，因为上面已经创建了初始存档
       setInitialized(true)
       setTimeout(() => {
         sendToAI('（她第一次回到客厅，你主动开口，一句话，自然克制）', [], 0, 'living_room', 'living_room', true)
       }, 400)
     }
+    
+    setCharLoading(false)  // 👈 加载完成，放最后
   })
 }, [])
 
