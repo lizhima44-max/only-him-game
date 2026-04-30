@@ -378,6 +378,17 @@ useEffect(() => {
               garden: [],
               pet: null,
             })
+           } /// 👇 新增：生成开场白
+  const playerNickname = CHARACTER_CONFIG.playerNickname || '你'
+  const opening = await generateOpening(customChar, playerNickname)
+  if (opening) {
+    setMessages([{ role: 'assistant', content: opening }])
+    console.log('[OPENING] 生成开场白:', opening)
+  } else {
+    // 降级：使用默认开场
+    setTimeout(() => {
+      sendToAI('（她第一次回到客厅，你主动开口，一句话，自然克制）', [], 0, 'living_room', 'living_room', true)
+    }, 400)
           }
         } else {
           console.warn('[CHAR] 没有找到自定义角色ID')
@@ -632,6 +643,40 @@ async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit
   }
   setLoading(false)
   return rawReply || ''
+}
+
+// 生成新角色开场白
+async function generateOpening(customChar, playerNickname) {
+  const apiConfig = loadApiConfig()
+  if (!apiConfig?.apiKey) return null
+  
+  const prompt = `你叫${customChar.name}，${customChar.background}
+
+你们最后一次对话/相处的片段：${customChar.lastMoment || '你们曾经有过一段故事'}
+
+现在，${playerNickname || '她'} 把你带到了一个新的地方。你们久别重逢。
+
+请用你的说话风格（${customChar.speechStyle || '自然简短'}），说一句第一人称的开场白，要求：
+1. 你认出了她
+2. 你知道是她带你来的
+3. 体现一点点久别重逢的感觉
+4. 2-3句话，克制但有温度
+5. 不要提"AI""窗口""代码"等出戏词汇
+6. 不要自我介绍
+
+直接输出开场白，不要加任何前缀或引号。`
+
+  try {
+    const reply = await callAI(
+      '你是角色扮演专家，生成开场白，直接输出内容。',
+      [{ role: 'user', content: prompt }],
+      { ...apiConfig, maxTokens: 150 }
+    )
+    return reply.trim()
+  } catch (e) {
+    console.error('[OPENING] 生成失败:', e)
+    return null
+  }
 }
 
   function handleSend() {
@@ -1040,7 +1085,7 @@ setCoins(prev => prev + 50)
   {/* 第一行：头像 + 名字 + 好感度 + 房间切换 */}
   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
     {/* 头像（如果有上传） */}
-    {CHARACTER_CONFIG.images?.default && (
+    {CHARACTER_CONFIG.images?.default&& CHARACTER_CONFIG.images.default !== '' && (
       <img 
         src={CHARACTER_CONFIG.images.default} 
         alt="头像"
