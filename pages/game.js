@@ -574,6 +574,7 @@ async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
 
 async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit = false, uid, isSystem = false) {
   setLoading(true)
+  const now = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   const basePrompt = getSystemPrompt(curIntimacy, pRoom, lRoom, outsidePlace, gameDay, season, weather, temp, isPeriodNow, sickWho)
   const systemPrompt = memoryBlock
     ? `${basePrompt}\n\n【过往记忆摘要】\n${memoryBlock}`
@@ -601,9 +602,18 @@ async function sendToAI(userText, currentMsgs, curIntimacy, pRoom, lRoom, isInit
       .trim()
 
     const newIntimacy = Math.min(100, curIntimacy + scoreTag)
-    let newMsgs = isInit || isSystem
-      ? [...currentMsgs, { role: 'assistant', content: reply }]
-      : [...currentMsgs, { role: 'user', content: userText }, { role: 'assistant', content: reply }]
+    const now = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+
+     // 👇 改这里
+    let newMsgs
+    if (isInit || isSystem) {
+      newMsgs = [...currentMsgs, { role: 'assistant', content: reply, timestamp: now }]
+    } else {
+      newMsgs = [...currentMsgs, 
+      { role: 'user', content: userText, timestamp: now },
+      { role: 'assistant', content: reply, timestamp: now }
+      ]
+    }
 
     const shouldDiary = (scoreTag >= 2 && Math.random() < 0.35) ||
                         (isSystem && userText.includes('结束') && Math.random() < 0.7)
@@ -1187,7 +1197,7 @@ setCoins(prev => prev + 50)
           WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 18%)',
         }}>
           <div style={{ flex: 1 }} />
-          {messages.map((m, i) => {
+            {messages.map((m, i) => {
             if (m.role === 'system') return (
               <div key={i} style={{ alignSelf: 'center', fontSize: '10px', color: 'rgba(201,169,110,0.25)', letterSpacing: '0.12em', padding: '2px 0' }}>{m.content}</div>
             )
@@ -1229,6 +1239,17 @@ setCoins(prev => prev + 50)
                     textShadow: '0 1px 4px rgba(0,0,0,0.9)',
                   }}>撤回重说</div>
                 )}
+                {/* 👇 加时间戳 */}
+                {m.timestamp && (
+                  <div style={{
+                    fontSize: '9px',
+                    color: 'rgba(201,169,110,0.35)',
+                    textAlign: m.role === 'user' ? 'right' : 'left',
+                    marginTop: '2px',
+                  }}>
+                    {m.timestamp}
+                  </div>
+               )}
               </div>
             )
           })}
