@@ -7,21 +7,9 @@ import CharacterCreator from '../components/CharacterCreator'
 import { listCustomCharacters, deleteCustomCharacter, saveCustomCharacter } from '../lib/characterImport'
 
 // ═══════════════════════════════════════════════════════════
-//  预设角色（敬请期待占位卡 + 陆绍桓）
+//  预设角色（陆绍桓 + 敬请期待占位卡）
 // ═══════════════════════════════════════════════════════════
 const DEFAULT_CHARACTERS = [
-  {
-    id: 'coming_1',
-    name: '···',
-    en: '',
-    tag: '敬请期待',
-    desc: '',
-    tags: [],
-    cardImg: null,
-    isPlaceholder: true,
-    theme: null,
-    glowColor: 'rgba(80,130,255,0.3)',
-  },
   {
     id: 'lu',
     name: '陆绍桓',
@@ -45,17 +33,26 @@ const DEFAULT_CHARACTERS = [
       tagColor: 'rgba(100,170,255,0.5)',
     },
   },
+  {
+    id: 'coming_1',
+    name: '···',
+    en: '',
+    tag: '敬请期待',
+    desc: '神秘角色，即将登场',
+    tags: [],
+    cardImg: null,
+    isPlaceholder: true,
+    glowColor: 'rgba(80,130,255,0.3)',
+  },
 ]
 
 export default function Lobby() {
   const router = useRouter()
   const trackRef = useRef(null)
   const [activeIdx, setActiveIdx] = useState(0)
-  const [showModal, setShowModal] = useState(false)
   const [selectedChar, setSelectedChar] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showCreator, setShowCreator] = useState(false)
-  const [showCharList, setShowCharList] = useState(false)
   const [customChars, setCustomChars] = useState([])
   const [userId, setUserId] = useState(null)
   const [allCards, setAllCards] = useState([])
@@ -65,7 +62,7 @@ export default function Lobby() {
   const [startX, setStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
 
-  // 构建卡片列表：占位卡 + 预设卡 + 自定义卡 + 入口卡
+  // 构建卡片列表：预设卡 + 占位卡 + 入口卡 + 自定义卡
   const buildCards = (customList) => {
     const customCards = customList.map(char => ({
       id: char.id,
@@ -93,7 +90,7 @@ export default function Lobby() {
     return [
       ...DEFAULT_CHARACTERS,
       ...customCards,
-      { id: 'custom_entry', isCustomEntry: true, name: '与他重逢', tag: '创造或导入你的故事' }
+      { id: 'custom_entry', isCustomEntry: true, name: '与他重逢', tag: '创造或导入你的故事', desc: '创造属于你的独特角色，开启专属故事' }
     ]
   }
 
@@ -108,29 +105,45 @@ export default function Lobby() {
     if (!userId) return
     const chars = await listCustomCharacters(supabase, userId)
     setCustomChars(chars)
-    setAllCards(buildCards(chars))
+    const cards = buildCards(chars)
+    setAllCards(cards)
+    // 默认选中第一个非占位角色（陆绍桓）
+    const firstRealChar = cards.find(c => !c.isPlaceholder && !c.isCustomEntry)
+    if (firstRealChar) setSelectedChar(firstRealChar)
   }
 
   useEffect(() => {
     if (userId) loadCustomChars()
   }, [userId])
 
-  // 滚动检测高亮中间卡片
+  // 滚动检测高亮中间卡片 + 更新底部选中内容
   useEffect(() => {
     const track = trackRef.current
-    if (!track) return
+    if (!track || allCards.length === 0) return
+    
     function onScroll() {
       const rect = track.getBoundingClientRect()
       const center = rect.left + rect.width / 2
       let closest = 0, minDist = Infinity
-      Array.from(track.children).forEach((el, i) => {
+      const children = Array.from(track.children)
+      
+      children.forEach((el, i) => {
         const r = el.getBoundingClientRect()
         const dist = Math.abs(r.left + r.width / 2 - center)
         if (dist < minDist) { minDist = dist; closest = i }
       })
+      
       setActiveIdx(closest)
+      
+      // 更新底部选中的卡片
+      const newSelectedCard = allCards[closest]
+      if (newSelectedCard) setSelectedChar(newSelectedCard)
     }
+    
     track.addEventListener('scroll', onScroll, { passive: true })
+    // 初始调用一次
+    setTimeout(onScroll, 100)
+    
     return () => track.removeEventListener('scroll', onScroll)
   }, [allCards])
 
@@ -151,15 +164,18 @@ export default function Lobby() {
 
   const handleMouseUp = () => setIsDragging(false)
 
-  function handleCardClick(char) {
-    if (char.isPlaceholder) return  // 占位卡不可点
-    if (char.isCustomEntry) {
-      setShowCharList(true)
-      loadCustomChars()
-      return
-    }
+  function handleSelectCustomFromEntry(char) {
+    // 从入口列表选择自定义角色
     setSelectedChar(char)
-    setShowModal(true)
+    // 滚动到该卡片位置（可选）
+    const track = trackRef.current
+    const cardIndex = allCards.findIndex(c => c.id === char.id)
+    if (track && cardIndex !== -1) {
+      const cardEl = track.children[cardIndex]
+      if (cardEl) {
+        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+      }
+    }
   }
 
   async function handleDeleteCustom(charId, e) {
@@ -170,82 +186,67 @@ export default function Lobby() {
     }
   }
 
-  function handleSelectCustom(char) {
-    localStorage.setItem('selectedCharId', 'custom')
-    localStorage.setItem('selectedCustomCharId', char.id)
-    localStorage.setItem('selectedCharTheme', JSON.stringify(char.theme))
-    setShowCharList(false)
+  async function handleEnter() {
     const cfg = loadApiConfig()
-    if (!cfg?.apiKey) setShowSettings(true)
-    else router.push('/game')
-  }
-
-
-async function handleEnter() {
-  const cfg = loadApiConfig()
-  if (!cfg?.apiKey) {
-    setShowModal(false)
-    setShowSettings(true)
-    return
-  }
-  
-  // 👇 如果是自定义角色，检查是否需要确认称呼
-  let finalSelectedChar = selectedChar
-  if (selectedChar?.isCustom && selectedChar.customData) {
-    // 检查是否已经确认过称呼（可以用一个标记，或者简单判断每次进入都问）
-    const storedNickname = localStorage.getItem(`nickname_${selectedChar.id}`)
+    if (!cfg?.apiKey) {
+      setShowSettings(true)
+      return
+    }
     
-    if (!storedNickname) {
-      // 弹窗让用户确认/修改称呼
-      const currentNickname = selectedChar.customData.playerNickname || '你'
-      const newNickname = prompt(`他应该怎么称呼你？\n\n当前：${currentNickname}\n\n（可以修改，比如：你、她、姐姐、宝贝...）`, currentNickname)
+    let finalSelectedChar = selectedChar
+    
+    // 如果是入口卡片，不应该进入游戏
+    if (selectedChar?.isCustomEntry) return
+    
+    if (selectedChar?.isCustom && selectedChar.customData) {
+      const storedNickname = localStorage.getItem(`nickname_${selectedChar.id}`)
       
-      if (newNickname !== null && newNickname.trim()) {
-        // 保存到 localStorage 标记已确认
-        localStorage.setItem(`nickname_${selectedChar.id}`, newNickname)
-        // 同时更新 selectedChar 对象
+      if (!storedNickname) {
+        const currentNickname = selectedChar.customData.playerNickname || '你'
+        const newNickname = prompt(`他应该怎么称呼你？\n\n当前：${currentNickname}\n\n（可以修改，比如：你、她、姐姐、宝贝...）`, currentNickname)
+        
+        if (newNickname !== null && newNickname.trim()) {
+          localStorage.setItem(`nickname_${selectedChar.id}`, newNickname)
+          finalSelectedChar = {
+            ...selectedChar,
+            customData: {
+              ...selectedChar.customData,
+              playerNickname: newNickname,              
+            }
+          }
+          if (finalSelectedChar.customData.customId) {
+            await saveCustomCharacter(supabase, userId, finalSelectedChar.customData)
+          }
+        } else {
+          return // 用户取消
+        }
+      } else {
         finalSelectedChar = {
           ...selectedChar,
           customData: {
             ...selectedChar.customData,
-            playerNickname: newNickname,              
+            playerNickname: storedNickname,
           }
         }
-        // 可选：保存到数据库
-         if (finalSelectedChar.customData.customId) {
-  await saveCustomCharacter(supabase, userId, finalSelectedChar.customData)
-}
       }
-    } else {
-      // 已经有存的称呼，使用它
-      finalSelectedChar = {
-        ...selectedChar,
-        customData: {
-          ...selectedChar.customData,
-          playerNickname: storedNickname,
+    }
+    
+    if (finalSelectedChar?.theme) {
+      if (finalSelectedChar.isCustom) {
+        localStorage.setItem('selectedCharId', 'custom')
+        localStorage.setItem('selectedCustomCharId', finalSelectedChar.id)
+        if (finalSelectedChar.customData?.playerNickname) {
+          localStorage.setItem(`playerNickname_${finalSelectedChar.id}`, finalSelectedChar.customData.playerNickname)
         }
+      } else {
+        localStorage.setItem('selectedCharId', finalSelectedChar.id)
+        localStorage.removeItem('selectedCustomCharId')
       }
+      localStorage.setItem('selectedCharTheme', JSON.stringify(finalSelectedChar.theme))
     }
+    
+    router.push('/game')
   }
-  
-  if (finalSelectedChar?.theme) {
-    // 关键修复：自定义角色存 'custom'，预设角色存自己的 id
-    if (finalSelectedChar.isCustom) {
-      localStorage.setItem('selectedCharId', 'custom')
-      localStorage.setItem('selectedCustomCharId', finalSelectedChar.id)
-      // 同时存一下称呼，供 game.js 使用
-      if (finalSelectedChar.customData?.playerNickname) {
-        localStorage.setItem(`playerNickname_${finalSelectedChar.id}`, finalSelectedChar.customData.playerNickname)
-      }
-    } else {
-      localStorage.setItem('selectedCharId', finalSelectedChar.id)
-      localStorage.removeItem('selectedCustomCharId')
-    }
-    localStorage.setItem('selectedCharTheme', JSON.stringify(finalSelectedChar.theme))
-  }
-  setShowModal(false)
-  router.push('/game')
-}
 
   // ═══════════════════════════════════════════════════════════
   //  渲染单张卡片
@@ -257,7 +258,6 @@ async function handleEnter() {
     const theme = char.theme
     const glowColor = theme?.glow || char.glowColor || 'rgba(80,130,255,0.2)'
 
-    // 卡片基础样式
     let cardStyle = {
       flexShrink: 0,
       scrollSnapAlign: 'center',
@@ -273,7 +273,6 @@ async function handleEnter() {
       boxShadow: isActive ? `0 0 25px ${glowColor}, 0 0 50px ${glowColor}` : 'none',
     }
 
-    // 根据卡片类型设置背景/边框
     if (isPlaceholder) {
       cardStyle = {
         ...cardStyle,
@@ -306,7 +305,7 @@ async function handleEnter() {
     }
 
     return (
-      <div key={char.id} style={glowWrapStyle} onClick={() => handleCardClick(char)}>
+      <div key={char.id} style={glowWrapStyle}>
         <div style={{ ...cardStyle, boxShadow: 'none' }}>
           
           {/* 占位卡片：敬请期待 */}
@@ -353,7 +352,7 @@ async function handleEnter() {
             </div>
           )}
 
-          {/* 正常角色卡片（陆绍桓 / 自定义角色） */}
+          {/* 正常角色卡片 */}
           {!isPlaceholder && !isCustomEntry && (
             <>
               <div style={{ position: 'absolute', inset: 0, background: theme?.cardBg }}>
@@ -391,6 +390,124 @@ async function handleEnter() {
     )
   }
 
+  // ═══════════════════════════════════════════════════════════
+  //  渲染底部详情面板
+  // ═══════════════════════════════════════════════════════════
+  const renderBottomPanel = () => {
+    if (!selectedChar) return null
+
+    // 占位卡底部
+    if (selectedChar.isPlaceholder) {
+      return (
+        <div style={{
+          padding: '24px 20px 40px',
+          textAlign: 'center',
+          background: 'linear-gradient(to top, rgba(2,1,12,0.95) 0%, rgba(2,1,12,0.6) 100%)',
+        }}>
+          <div style={{ fontSize: '32px', color: 'rgba(140,190,255,0.3)', marginBottom: '16px' }}>✦</div>
+          <div style={{ fontSize: '18px', color: 'rgba(200,225,255,0.6)', marginBottom: '8px' }}>敬请期待</div>
+          <div style={{ fontSize: '12px', color: 'rgba(160,200,255,0.35)' }}>COMING SOON</div>
+        </div>
+      )
+    }
+
+    // 自定义入口卡片底部
+    if (selectedChar.isCustomEntry) {
+      return (
+        <div style={{
+          padding: '24px 20px 40px',
+          background: 'linear-gradient(to top, rgba(2,1,12,0.98) 0%, rgba(2,1,12,0.5) 100%)',
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <div style={{ fontSize: '16px', color: 'rgba(180,210,255,0.5)', marginBottom: '8px' }}>还没有属于你的故事？</div>
+            <div style={{ fontSize: '12px', color: 'rgba(160,200,255,0.35)' }}>创造属于你的独特角色</div>
+          </div>
+
+          {/* 已有自定义角色列表 */}
+          {customChars.length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', color: 'rgba(160,200,255,0.4)', marginBottom: '12px', letterSpacing: '0.1em' }}>你的故事集</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '180px', overflowY: 'auto' }}>
+                {customChars.map(char => (
+                  <div key={char.id} onClick={() => handleSelectCustomFromEntry(char)} style={{
+                    padding: '12px 16px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(140,190,255,0.1)',
+                    borderRadius: '14px',
+                    cursor: 'pointer',
+                    position: 'relative',
+                  }}>
+                    <div style={{ fontSize: '15px', color: 'rgba(220,235,255,0.9)', marginBottom: '4px' }}>{char.name}</div>
+                    <div style={{ fontSize: '10px', color: 'rgba(160,200,255,0.4)' }}>{char.tagline}</div>
+                    <button onClick={(e) => handleDeleteCustom(char.id, e)} style={{
+                      position: 'absolute', bottom: '10px', right: '12px',
+                      background: 'none', border: 'none', color: 'rgba(255,100,100,0.35)',
+                      fontSize: '11px', cursor: 'pointer',
+                    }}>删除</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button onClick={() => setShowCreator(true)} style={{
+            width: '100%', padding: '14px',
+            background: 'linear-gradient(135deg, rgba(80,140,255,0.2), rgba(120,80,255,0.15))',
+            border: '1px solid rgba(140,180,255,0.3)', borderRadius: '14px',
+            cursor: 'pointer', color: 'rgba(230,240,255,0.9)', fontSize: '13px',
+            fontFamily: 'Georgia, serif', letterSpacing: '0.1em',
+          }}>
+            + 创造新的他
+          </button>
+        </div>
+      )
+    }
+
+    // 正常角色卡片底部
+    const theme = selectedChar.theme
+    return (
+      <div style={{
+        padding: '20px 24px 34px',
+        background: 'linear-gradient(to top, rgba(2,1,12,0.98) 0%, rgba(2,1,12,0.7) 100%)',
+      }}>
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ fontSize: '24px', color: 'rgba(215,230,255,0.95)', fontStyle: 'italic', marginBottom: '2px' }}>{selectedChar.name}</div>
+          {selectedChar.en && (
+            <div style={{ fontSize: '9px', color: 'rgba(140,190,255,0.4)', letterSpacing: '0.2em', marginBottom: '14px' }}>{selectedChar.en}</div>
+          )}
+          <div style={{ fontSize: '13px', color: 'rgba(185,215,245,0.65)', lineHeight: 1.8, marginBottom: '16px' }}>{selectedChar.desc}</div>
+          
+          {/* 标签 */}
+          {selectedChar.tags?.length > 0 && (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '28px' }}>
+              {selectedChar.tags.map(tag => (
+                <span key={tag} style={{
+                  padding: '4px 12px', borderRadius: '20px',
+                  border: `1px solid ${theme?.tagBorder || 'rgba(80,160,255,0.2)'}`,
+                  fontSize: '10px',
+                  color: theme?.tagColor || 'rgba(100,170,255,0.55)',
+                }}>{tag}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button onClick={handleEnter} style={{
+          width: '100%', padding: '14px',
+          background: theme?.btnBg || 'linear-gradient(135deg, rgba(60,120,255,0.25), rgba(40,80,220,0.35))',
+          border: `1px solid ${theme?.btnBorder || 'rgba(80,160,255,0.35)'}`,
+          color: theme?.btnColor || 'rgba(180,220,255,0.9)',
+          borderRadius: '14px', fontSize: '13px', cursor: 'pointer',
+          fontFamily: 'Georgia, serif', letterSpacing: '0.12em',
+          boxShadow: theme?.btnShadow,
+          textShadow: `0 0 10px rgba(${theme?.accent || '100,180,255'},0.6)`,
+        }}>
+          呼唤他
+        </button>
+      </div>
+    )
+  }
+
   return (
     <>
       <style>{`
@@ -401,8 +518,6 @@ async function handleEnter() {
         .card-track { scrollbar-width: none; -webkit-overflow-scrolling: touch; cursor: grab; user-select: none; }
         .card-track:active { cursor: grabbing; }
         .card-track::-webkit-scrollbar { display: none; }
-        .modal-desc { overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-        .modal-desc::-webkit-scrollbar { display: none; }
       `}</style>
 
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#020108' }}>
@@ -427,8 +542,8 @@ async function handleEnter() {
               <div style={{ fontSize: '11px', color: 'rgba(200,225,255,0.65)', letterSpacing: '0.2em', marginTop: '10px' }}>选择你的故事</div>
             </div>
 
-            {/* 卡片滑轨 */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}>
+            {/* 卡片滑轨 - 留出底部面板空间 */}
+            <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'visible', marginTop: '8px' }}>
               <div
                 ref={trackRef}
                 className="card-track"
@@ -447,7 +562,7 @@ async function handleEnter() {
             </div>
 
             {/* 点导航 */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', padding: '0 0 14px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', padding: '12px 0 6px', flexShrink: 0 }}>
               {allCards.map((_, i) => (
                 <div key={i} style={{
                   height: '4px', transition: 'all 0.3s',
@@ -459,154 +574,20 @@ async function handleEnter() {
               ))}
             </div>
 
-            <div className="shimmer" style={{ textAlign: 'center', padding: '0 0 28px', flexShrink: 0, fontSize: '11px', letterSpacing: '0.25em', color: 'rgba(200,225,255,0.7)' }}>
-              ← 拖拽滑动 · 点卡了解 →
+            {/* 底部详情面板 - 主要内容区域 */}
+            <div style={{ flex: 1, overflow: 'hidden', marginTop: 'auto' }}>
+              {renderBottomPanel()}
             </div>
+
           </div>
 
-          {/* ═══════════════════════════════════════════════════════════ */}
-          {/* 自定义角色列表弹窗 */}
-          {/* ═══════════════════════════════════════════════════════════ */}
-          {showCharList && (
-            <div onClick={() => setShowCharList(false)} style={{
-              position: 'absolute', inset: 0, zIndex: 100,
-              background: 'rgba(2,1,12,0.95)', backdropFilter: 'blur(20px)',
-              display: 'flex', flexDirection: 'column',
-            }}>
-              <div onClick={e => e.stopPropagation()} style={{ flex: 1, padding: '40px 24px', overflowY: 'auto' }}>
-                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                  <div style={{ fontSize: '20px', color: 'rgba(230,240,255,0.95)', fontStyle: 'italic', marginBottom: '8px' }}>你的故事</div>
-                  <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.45)' }}>选择一个他，或者创造新的</div>
-                </div>
-
-                {customChars.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(180,210,255,0.3)', fontSize: '13px' }}>
-                    还没有属于你的故事<br />点击下方按钮创造
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                    {customChars.map(char => (
-                      <div key={char.id} onClick={() => handleSelectCustom(char)} style={{
-                        padding: '16px', background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(140,190,255,0.12)', borderRadius: '16px',
-                        cursor: 'pointer', position: 'relative',
-                      }}>
-                        <div style={{ fontSize: '18px', color: 'rgba(220,235,255,0.95)', marginBottom: '6px' }}>{char.name}</div>
-                        <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.4)' }}>{char.tagline}</div>
-                        {char.tags?.length > 0 && (
-                          <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
-                            {char.tags.slice(0, 3).map(tag => (
-                              <span key={tag} style={{
-                                fontSize: '9px', padding: '2px 8px',
-                                border: '1px solid rgba(140,190,255,0.15)',
-                                borderRadius: '20px', color: 'rgba(180,210,255,0.5)',
-                              }}>{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                        <button onClick={(e) => handleDeleteCustom(char.id, e)} style={{
-                          position: 'absolute', bottom: '12px', right: '12px',
-                          background: 'none', border: 'none', color: 'rgba(255,100,100,0.4)',
-                          fontSize: '12px', cursor: 'pointer',
-                        }}>删除</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <button onClick={() => { setShowCharList(false); setShowCreator(true) }} style={{
-                  width: '100%', padding: '14px',
-                  background: 'linear-gradient(135deg, rgba(80,140,255,0.2), rgba(120,80,255,0.15))',
-                  border: '1px solid rgba(140,180,255,0.3)', borderRadius: '14px',
-                  cursor: 'pointer', color: 'rgba(230,240,255,0.9)', fontSize: '13px',
-                  fontFamily: 'Georgia, serif', letterSpacing: '0.1em',
-                }}>+ 创造新的他</button>
-
-                <button onClick={() => setShowCharList(false)} style={{
-                  display: 'block', margin: '20px auto 0', background: 'none', border: 'none',
-                  color: 'rgba(180,210,255,0.3)', fontSize: '12px', cursor: 'pointer',
-                }}>返回</button>
-              </div>
-            </div>
-          )}
-
-          {/* ═══════════════════════════════════════════════════════════ */}
-          {/* 角色详情弹窗 */}
-          {/* ═══════════════════════════════════════════════════════════ */}
-          {showModal && selectedChar && (
-            <div onClick={() => setShowModal(false)} style={{
-              position: 'absolute', inset: 0, zIndex: 100,
-              background: 'rgba(2,1,12,0.9)', backdropFilter: 'blur(18px)',
-              display: 'flex', flexDirection: 'column',
-            }}>
-              <div onClick={e => e.stopPropagation()} style={{ flex: '0 0 50%', position: 'relative', overflow: 'hidden' }}>
-                {selectedChar.cardImg ? (
-                  <img src={selectedChar.cardImg} alt={selectedChar.name} style={{
-                    width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 10%',
-                  }} />
-                ) : (
-                  <div style={{
-                    width: '100%', height: '100%', background: selectedChar.theme?.cardBg || '#080c18',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '48px', color: 'rgba(100,160,255,0.12)',
-                  }}>✦</div>
-                )}
-                <div style={{
-                  position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%',
-                  background: 'linear-gradient(to top, rgba(4,7,20,1) 0%, transparent 100%)',
-                }} />
-                <button onClick={() => setShowModal(false)} style={{
-                  position: 'absolute', top: '16px', right: '16px',
-                  background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'rgba(255,255,255,0.45)', borderRadius: '50%',
-                  width: '32px', height: '32px', cursor: 'pointer',
-                }}>✕</button>
-              </div>
-
-              <div onClick={e => e.stopPropagation()} style={{
-                flex: 1, display: 'flex', flexDirection: 'column',
-                background: 'linear-gradient(to bottom, rgba(4,7,20,1) 0%, #060c20 100%)',
-                borderTop: '1px solid rgba(80,160,255,0.08)', overflow: 'hidden',
-              }}>
-                <div className="modal-desc" style={{ flex: 1, overflowY: 'auto', padding: '18px 24px 0' }}>
-                  <div style={{ fontSize: '24px', color: 'rgba(215,230,255,0.95)', fontStyle: 'italic', marginBottom: '3px' }}>{selectedChar.name}</div>
-                  <div style={{ fontSize: '9px', color: 'rgba(140,190,255,0.4)', letterSpacing: '0.25em', marginBottom: '14px' }}>{selectedChar.en || ''}</div>
-                  <div style={{ fontSize: '13px', color: 'rgba(185,215,245,0.6)', lineHeight: 2, marginBottom: '16px' }}>{selectedChar.desc}</div>
-                  <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                    {selectedChar.tags?.map(tag => (
-                      <span key={tag} style={{
-                        padding: '4px 10px', borderRadius: '20px',
-                        border: `1px solid ${selectedChar.theme?.tagBorder || 'rgba(80,160,255,0.15)'}`,
-                        fontSize: '9px',
-                        color: selectedChar.theme?.tagColor || 'rgba(100,170,255,0.45)',
-                      }}>{tag}</span>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ padding: '14px 24px 40px', flexShrink: 0, background: 'linear-gradient(to bottom, transparent, rgba(6,10,28,0.95) 30%)' }}>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => setShowModal(false)} style={{
-                      flex: 1, padding: '14px', background: 'none',
-                      border: '1px solid rgba(255,255,255,0.05)',
-                      color: 'rgba(255,255,255,0.2)', borderRadius: '14px',
-                      fontSize: '13px', cursor: 'pointer',
-                    }}>再想想</button>
-                    <button onClick={handleEnter} style={{
-                      flex: 2, padding: '14px',
-                      background: selectedChar.theme?.btnBg || 'linear-gradient(135deg, rgba(60,120,255,0.25), rgba(40,80,220,0.35))',
-                      border: `1px solid ${selectedChar.theme?.btnBorder || 'rgba(80,160,255,0.35)'}`,
-                      color: selectedChar.theme?.btnColor || 'rgba(180,220,255,0.9)',
-                      borderRadius: '14px', fontSize: '13px', cursor: 'pointer',
-                      fontFamily: 'Georgia, serif', letterSpacing: '0.12em',
-                      boxShadow: selectedChar.theme?.btnShadow,
-                      textShadow: `0 0 10px rgba(${selectedChar.theme?.accent || '100,180,255'},0.6)`,
-                    }}>呼唤他</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* 角色创建弹窗 */}
+          <CharacterCreator
+            show={showCreator}
+            userId={userId}
+            onClose={() => { setShowCreator(false); loadCustomChars() }}
+            onComplete={() => { setShowCreator(false); loadCustomChars() }}
+          />
 
         </div>
 
@@ -617,17 +598,13 @@ async function handleEnter() {
             const cfg = loadApiConfig()
             if (cfg?.apiKey) {
               const id = localStorage.getItem('selectedCharId')
-              if (id === 'custom' && localStorage.getItem('selectedCustomCharId')) router.push('/game')
-              else if (id && id !== 'custom') router.push('/game')
+              if (id === 'custom' && localStorage.getItem('selectedCustomCharId')) {
+                router.push('/game')
+              } else if (id && id !== 'custom') {
+                router.push('/game')
+              }
             }
           }}
-        />
-
-        <CharacterCreator
-          show={showCreator}
-          userId={userId}
-          onClose={() => { setShowCreator(false); loadCustomChars() }}
-          onComplete={() => { setShowCreator(false); loadCustomChars() }}
         />
       </div>
     </>
