@@ -1244,7 +1244,7 @@ setCoins(prev => prev + 50)
                   <div style={{
                     fontSize: '9px',
                     color: 'rgba(201,169,110,0.35)',
-                    textAlign: m.role === 'user' ? 'right' : 'left',
+                    textAlign: 'right',  // 👈 改成 right
                     marginTop: '2px',
                   }}>
                     {m.timestamp}
