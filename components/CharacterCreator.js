@@ -193,6 +193,7 @@ ${textToAnalyze}
   "tags": ["标签1", "标签2", "标签3", "标签4", "标签5"],
   "tagline": "一句话人设总结",
   "intimacyLevel": 数字(0-100)，根据对话中两人的亲密程度判断，
+  "lastMoment": "对话最后一段的精华（1-2句话），体现你们最后一刻的关系状态或他对你说的最后一句话，要能让人立刻想起那个瞬间",
   "importantMemories": [
     { "title": "第一次相遇", "desc": "根据对话推测或提取的具体描述", "importance": 5 },
     { "title": "重要事件2", "desc": "描述", "importance": 4 },
@@ -206,8 +207,9 @@ ${textToAnalyze}
 3. importance 范围 1-5，5 最重要
 4. playerNickname 从对话中找出他对女主的称呼
 5. intimacyLevel 根据对话中两人的亲密度判断（刚认识=10-20，开始熟悉=30-40，牵手拥抱=50-60，亲吻=70-80，亲密关系=90+）
-6. importantMemories 提取至少2-3个这段对话中的关键事件/经典时刻/重要转折
-7. 所有描述基于对话实际内容，对话中没有的信息不要编造`
+6. lastMoment 是对话最后几轮的精简（1-2句），要能体现当时的氛围
+7. importantMemories 提取至少2-3个这段对话中的关键事件/经典时刻/重要转折
+8. 所有描述基于对话实际内容，对话中没有的信息不要编造`
 
       
       const reply = await callAI(
@@ -406,6 +408,9 @@ async function handleSaveAnalyzed() {
   if (!analyzed) return
   
   console.log('[DEBUG] 重要回忆数量:', analyzed.importantMemories?.length || 0)
+  console.log('[DEBUG] 重要回忆数量:', analyzed.importantMemories?.length || 0)
+  console.log('[DEBUG] 最后时刻:', analyzed.lastMoment || '未识别')
+  console.log('[DEBUG] 好感度:', analyzed.intimacyLevel || '未识别')
   
   setSaving(true)
   

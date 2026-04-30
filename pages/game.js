@@ -1031,96 +1031,110 @@ setCoins(prev => prev + 50)
         display: 'flex', flexDirection: 'column', color: '#e8dcc8',
       }}>
 
-        {/* 顶部 */}
-        <div style={{
-          padding: '12px 16px 8px',
-          background: 'linear-gradient(to bottom, rgba(8,6,4,0.88), rgba(8,6,4,0))',
-          flexShrink: 0,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <div style={{ fontSize: '16px', color: '#c9a96e', fontWeight: 'bold', letterSpacing: '0.05em', flexShrink: 0 }}>
-              {CHARACTER_CONFIG.name}
-            </div>
-            {gameDay > 0 && (
-  <div style={{
-    fontSize: '10px', color: 'rgba(201,169,110,0.5)', flexShrink: 0,
-    textShadow: '0 1px 3px rgba(0,0,0,0.9)',
-  }}>
-    {getWeatherInfo(weather).emoji} {temp}°
-    <span style={{ fontSize: '10px', color: 'rgba(255,200,60,0.5)', marginLeft: '6px' }}>💰{coins}</span>
-    {isPeriodNow && ' 🩸'}
-    {sickWho === 'lu' && ' 🤒'}
+{/* 顶部 */}
+<div style={{
+  padding: '12px 16px 8px',
+  background: 'linear-gradient(to bottom, rgba(8,6,4,0.88), rgba(8,6,4,0))',
+  flexShrink: 0,
+}}>
+  {/* 第一行：头像 + 名字 + 好感度 + 房间切换 */}
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+    {/* 头像（如果有上传） */}
+    {CHARACTER_CONFIG.images?.default && (
+      <img 
+        src={CHARACTER_CONFIG.images.default} 
+        alt="头像"
+        style={{
+          width: '28px',
+          height: '28px',
+          borderRadius: '50%',
+          objectFit: 'cover',
+          border: '1px solid rgba(201,169,110,0.4)',
+          backgroundColor: 'rgba(0,0,0,0.3)',
+          boxShadow: '0 0 8px rgba(201,169,110,0.2)',
+        }}
+      />
+    )}
+    
+    {/* 名字 */}
+    <div style={{ fontSize: '16px', color: '#c9a96e', fontWeight: 'bold', letterSpacing: '0.05em', flexShrink: 0 }}>
+      {CHARACTER_CONFIG.name}
+    </div>
+    
+    {/* 好感度星星 */}
+    <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', flexShrink: 0 }}>
+      {'♥'.repeat(intimacyStars)}{'♡'.repeat(5 - intimacyStars)}
+      <span style={{ marginLeft: '4px', fontSize: '10px', color: 'rgba(201,169,110,0.28)' }}>{intimacy}</span>
+    </div>
+    
+    {/* 房间切换按钮 */}
+    <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
+      {ROOMS.map(room => {
+        const active = playerRoom === room.id
+        return (
+          <button key={room.id} onClick={() => handleRoomChange(room.id)} style={{
+            padding: '3px 7px', fontSize: '11px', background: 'none', border: 'none',
+            borderBottom: active ? '1px solid rgba(201,169,110,0.7)' : '1px solid transparent',
+            color: active ? '#c9a96e' : 'rgba(255,255,255,0.28)',
+            cursor: 'pointer', letterSpacing: '0.03em', transition: 'all 0.2s',
+          }}>{room.name}</button>
+        )
+      })}
+      <button onClick={() => setShowOutside(true)} style={{
+        padding: '3px 7px', fontSize: '11px', background: 'none', border: 'none',
+        borderBottom: isOutside ? '1px solid rgba(201,169,110,0.7)' : '1px solid transparent',
+        color: isOutside ? '#c9a96e' : 'rgba(255,255,255,0.28)',
+        cursor: 'pointer', letterSpacing: '0.03em',
+      }}>外出</button>
+    </div>
   </div>
-)}
-            <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', flexShrink: 0 }}>
-              {'♥'.repeat(intimacyStars)}{'♡'.repeat(5 - intimacyStars)}
-              <span style={{ marginLeft: '4px', fontSize: '10px', color: 'rgba(201,169,110,0.28)' }}>{intimacy}</span>
-            </div>
-            <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
-              {ROOMS.map(room => {
-                const active = playerRoom === room.id
-                return (
-                  <button key={room.id} onClick={() => handleRoomChange(room.id)} style={{
-                    padding: '3px 7px', fontSize: '11px', background: 'none', border: 'none',
-                    borderBottom: active ? '1px solid rgba(201,169,110,0.7)' : '1px solid transparent',
-                    color: active ? '#c9a96e' : 'rgba(255,255,255,0.28)',
-                    cursor: 'pointer', letterSpacing: '0.03em', transition: 'all 0.2s',
-                  }}>{room.name}</button>
-                )
-              })}
-              <button onClick={() => setShowOutside(true)} style={{
-                padding: '3px 7px', fontSize: '11px', background: 'none', border: 'none',
-                borderBottom: isOutside ? '1px solid rgba(201,169,110,0.7)' : '1px solid transparent',
-                color: isOutside ? '#c9a96e' : 'rgba(255,255,255,0.28)',
-                cursor: 'pointer', letterSpacing: '0.03em',
-              }}>外出</button>
-            </div>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '5px' }}>
-            <div style={{
-              fontSize: '10px', color: 'rgba(201,169,110,0.65)',
-              textShadow: '0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8)',
-            }}>
-              {luMoving
-                ? <span style={{ color: 'rgba(201,169,110,0.8)' }}>他在移动…</span>
-                : isOutside ? `· ${currentPlace?.name || '外出中'}`
-                : sameRoom ? '· 同处' : `他在${ROOMS.find(r => r.id === luRoom)?.name}`}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {!sameRoom && !isOutside && !luMoving && (
-                <button onClick={handleCallLu} style={{
-                  fontSize: '10px', background: 'none',
-                  border: '1px solid rgba(201,169,110,0.2)',
-                  color: 'rgba(201,169,110,0.55)', padding: '3px 10px',
-                  borderRadius: '20px', cursor: 'pointer', letterSpacing: '0.05em',
-                }}>叫他过来</button>
-              )}
-              <button onClick={() => setShowSettings(true)} style={{
-                     fontSize: '9px', background: 'none', border: '1px solid rgba(201,169,110,0.15)',
-                     color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
-                     letterSpacing: '0.05em', padding: '3px 8px', borderRadius: '12px',
-              }}>⚙</button>
-              
-
-<button onClick={() => setShowCalendar(true)} style={{
-  fontSize: '9px', background: 'none',
-  border: '1px solid rgba(201,169,110,0.15)',
-  color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
-  padding: '3px 8px', borderRadius: '12px',
-}}>📅</button>
-              <button onClick={async () => {
-                await supabase.auth.signOut()
-                router.push('/')
-              }} style={{
-                fontSize: '9px', background: 'none', border: 'none',
-                color: 'rgba(255,255,255,0.2)', cursor: 'pointer',
-                letterSpacing: '0.05em', padding: '2px 0',
-                textShadow: '0 1px 3px rgba(0,0,0,0.9)',
-              }}>登出</button>
-            </div>
-          </div>
-        </div>
+  {/* 第二行：位置 + 设置按钮 */}
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '5px' }}>
+    <div style={{
+      fontSize: '10px', color: 'rgba(201,169,110,0.65)',
+      textShadow: '0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8)',
+    }}>
+      {luMoving
+        ? <span style={{ color: 'rgba(201,169,110,0.8)' }}>他在移动…</span>
+        : isOutside ? `· ${currentPlace?.name || '外出中'}`
+        : sameRoom ? '· 同处' : `他在${ROOMS.find(r => r.id === luRoom)?.name}`}
+    </div>
+    
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      {!sameRoom && !isOutside && !luMoving && (
+        <button onClick={handleCallLu} style={{
+          fontSize: '10px', background: 'none',
+          border: '1px solid rgba(201,169,110,0.2)',
+          color: 'rgba(201,169,110,0.55)', padding: '3px 10px',
+          borderRadius: '20px', cursor: 'pointer', letterSpacing: '0.05em',
+        }}>叫他过来</button>
+      )}
+      <button onClick={() => setShowSettings(true)} style={{
+        fontSize: '9px', background: 'none', border: '1px solid rgba(201,169,110,0.15)',
+        color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
+        letterSpacing: '0.05em', padding: '3px 8px', borderRadius: '12px',
+      }}>⚙</button>
+      
+      <button onClick={() => setShowCalendar(true)} style={{
+        fontSize: '9px', background: 'none',
+        border: '1px solid rgba(201,169,110,0.15)',
+        color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
+        padding: '3px 8px', borderRadius: '12px',
+      }}>📅</button>
+      
+      <button onClick={async () => {
+        await supabase.auth.signOut()
+        router.push('/')
+      }} style={{
+        fontSize: '9px', background: 'none', border: 'none',
+        color: 'rgba(255,255,255,0.2)', cursor: 'pointer',
+        letterSpacing: '0.05em', padding: '2px 0',
+        textShadow: '0 1px 3px rgba(0,0,0,0.9)',
+      }}>登出</button>
+    </div>
+  </div>
+</div>
 
         {/* 对话区 */}
         <div style={{
@@ -1185,51 +1199,6 @@ setCoins(prev => prev + 50)
 
         {/* 输入区 + 破次元立绘 */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          {sameRoom && !isOutside && (() => {
-            // 立绘状态判断
-            const charState =
-              intimatePhase === 'game' ? 'intense' :
-              intimatePhase === 'aftercare' ? 'aftercare' :
-              (bathPhase === 'active' || expandedAction === 'niwai') ? 'shy' :
-              'default'
-            const imgSrc = getCharImg(charState)
-            // CSS滤镜占位（图片不存在时靠这撑着，图片有了自动生效）
-            const imgFilter =
-              charState === 'shy' ? 'saturate(1.1) brightness(1.05)' :
-              charState === 'intense' ? 'saturate(0.9) brightness(0.9) contrast(1.1)' :
-              charState === 'aftercare' ? 'saturate(0.8) brightness(1.1)' :
-              'none'
-            return (
-              <div style={{
-                position: 'absolute',
-                bottom: '10px',
-                left: '-32px',  // 往左移，探出感更强
-                width: '90px', height: '130px',
-                zIndex: 50, pointerEvents: 'none',
-                opacity: luMoving ? 0 : 1,
-                transition: 'opacity 0.4s, filter 0.5s',
-                animation: luMoving ? 'none' : 'breathe 4s ease-in-out infinite',
-                filter: imgFilter,
-              }}>
-                <img
-                  src={imgSrc}
-                  alt={CHARACTER_CONFIG.name}
-                  onError={e => { if (imgSrc !== CHARACTER_CONFIG.images.default) e.target.src = CHARACTER_CONFIG.images.default }}
-                  style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'bottom center' }}
-                />
-                {/* 害羞状态：粉色晕染叠层（无图时的视觉提示） */}
-                {charState === 'shy' && (
-                  <div style={{
-                    position: 'absolute', inset: 0,
-                    background: 'radial-gradient(ellipse at 60% 35%, rgba(255,180,160,0.12) 0%, transparent 70%)',
-                    pointerEvents: 'none',
-                  }} />
-                )}
-              </div>
-            )
-          })()}
-
-
           {/* ── 互动按钮行 + 输入框 ── */}
           <div style={{
             background: 'linear-gradient(to top, rgba(8,6,4,0.97) 60%, rgba(8,6,4,0) 100%)',
