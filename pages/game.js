@@ -285,7 +285,7 @@ useEffect(() => {
     if (!session) { router.push('/'); return }
     setUser(session.user)
     setUserId(session.user.id)
-    
+
     // 获取当前角色ID的函数（只定义一次）
     const getCurrentCharIdForSave = () => {
       const selectedId = localStorage.getItem('selectedCharId')
@@ -294,7 +294,7 @@ useEffect(() => {
       }
       return 'lu'
     }
-    
+
     // 检查是否选了自定义角色
     const selectedCharId = localStorage.getItem('selectedCharId')
     if (selectedCharId === 'custom') {
@@ -321,38 +321,38 @@ useEffect(() => {
             intimatePrefix: customChar.intimatePrefix || CHARACTER_CONFIG.intimatePrefix,
             playerNickname: customChar.playerNickname || '你',
           }
-          
-          // 读取保存的称呼
+
           const savedNickname = localStorage.getItem(`playerNickname_${customCharId}`)
           if (savedNickname) {
             CHARACTER_CONFIG.playerNickname = savedNickname
           }
-          
-          // 设置好感度
+
           if (customChar.intimacyLevel !== undefined && customChar.intimacyLevel > 0) {
             setIntimacy(customChar.intimacyLevel)
             console.log('[CHAR] 设置初始好感度:', customChar.intimacyLevel)
           }
-          
-          // 加载重要回忆
+
           const memories = await loadCharacterMemories(supabase, session.user.id, customCharId)
           setImportantMemories(memories)
           console.log('[MEMORY] 加载重要回忆:', memories.length)
-          
+
           // 检查是否为新角色（没有存档）
           const { data: existingSave } = await supabase
             .from('game_saves')
             .select('id')
             .eq('user_id', session.user.id)
-            .eq('character_id', customCharId)
+            .eq('character_id', encodeURIComponent(customCharId))
             .single()
-          
+
           if (!existingSave) {
             console.log('[CHAR] 新角色，创建初始存档，好感度:', customChar.intimacyLevel || 0)
+            const initialIntimacy = customChar.intimacyLevel || 0
+            setIntimacy(initialIntimacy)
+
             await supabase.from('game_saves').insert({
               user_id: session.user.id,
               character_id: customCharId,
-              intimacy: customChar.intimacyLevel || 0,
+              intimacy: initialIntimacy,
               chat_history: [],
               current_room: 'living_room',
               lu_location: 'guest_room',
@@ -378,25 +378,25 @@ useEffect(() => {
               garden: [],
               pet: null,
             })
-           } /// 👇 新增：生成开场白
-  const playerNickname = CHARACTER_CONFIG.playerNickname || '你'
-  const opening = await generateOpening(customChar, playerNickname)
-  if (opening) {
-    setMessages([{ role: 'assistant', content: opening }])
-    console.log('[OPENING] 生成开场白:', opening)
-  } else {
-    // 降级：使用默认开场
-    setTimeout(() => {
-      sendToAI('（她第一次回到客厅，你主动开口，一句话，自然克制）', [], 0, 'living_room', 'living_room', true)
-    }, 400)
+
+            const playerNickname = CHARACTER_CONFIG.playerNickname || '你'
+            const opening = await generateOpening(customChar, playerNickname)
+            if (opening) {
+              setMessages([{ role: 'assistant', content: opening }])
+              await supabase.from('game_saves').update({
+                chat_history: [{ role: 'assistant', content: opening }]
+              }).eq('user_id', session.user.id).eq('character_id', customCharId)
+            }
+
+            setInitialized(true)
+            setCharLoading(false)
+            return
           }
-        } else {
-          console.warn('[CHAR] 没有找到自定义角色ID')
         }
       }
     }
-    
-    // 加载存档
+
+    // 加载存档（新角色因为有 return，不会执行到这里）
     const currentCharId = getCurrentCharIdForSave()
     const { data } = await supabase
       .from('game_saves')
@@ -404,9 +404,9 @@ useEffect(() => {
       .eq('user_id', session.user.id)
       .eq('character_id', currentCharId)
       .single()
-    
+
     const isReturningUser = data && data.chat_history && data.chat_history.length > 0
-    
+
     if (isReturningUser) {
       setIntimacy(data.intimacy || 0)
       setPlayerRoom(data.current_room || 'living_room')
@@ -434,8 +434,7 @@ useEffect(() => {
       setCurrentOutfit(data.current_outfit || 'daily_white')
       setBedsideItems(data.bedside_items || [])
       setInitialized(true)
-      
-      // 自动检测新一天
+
       const savedDate = data.last_date || ''
       const today = todayStr()
       if (savedDate !== today) {
@@ -446,7 +445,7 @@ useEffect(() => {
             romantic: data.romantic || 0,
             periodDays: data.period_days || [],
           }, realW)
-          
+
           setGameDay(result.day)
           setSeason(result.season)
           setWeather(result.weather)
@@ -457,21 +456,21 @@ useEffect(() => {
           setIsPeriodNow(result.isPeriod)
           setLastDate(today)
           setCoins(prev => prev + 50)
-          
+
           if (data.garden?.length > 0) {
             const gardenResult = updateGardenDaily(data.garden, result.day, result.season)
             setGarden(gardenResult.garden)
           }
-          
+
           if (data.pet) {
             const updatedPet = updatePetDaily(data.pet)
             setPet(updatedPet)
           }
-          
+
           const sysMsgs = result.events.map(e => ({ role: 'system', content: e }))
           setMessages(prev => [...prev, ...sysMsgs])
           setToast(result.events[0])
-          
+
           await supabase.from('game_saves').update({
             game_day: result.day, season: result.season, weather: result.weather,
             temp: result.temp, sick_who: result.sickWho, romantic: result.romantic,
@@ -480,14 +479,13 @@ useEffect(() => {
         }, 500)
       }
     } else {
-      // 没有存档，不需要创建，因为上面已经创建了初始存档
       setInitialized(true)
       setTimeout(() => {
         sendToAI('（她第一次回到客厅，你主动开口，一句话，自然克制）', [], 0, 'living_room', 'living_room', true)
       }, 400)
     }
-    
-    setCharLoading(false)  // 👈 加载完成，放最后
+
+    setCharLoading(false)
   })
 }, [])
 
