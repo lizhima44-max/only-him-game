@@ -5,7 +5,7 @@
 import { useState, useRef } from 'react'
 import { callAI, loadApiConfig } from '../lib/apiClient'
 import { supabase } from '../lib/supabase'
-import { fillDefaults, saveCustomCharacter, saveCharacterMemories } from '../lib/characterImport'
+import { fillDefaults, saveCustomCharacter, saveCharacterMemories , uploadCharacterImage} from '../lib/characterImport'
 
 export default function CharacterCreator({ show, onClose, userId, onComplete }) {
   const [tab, setTab] = useState('craft')  // 'craft' | 'summon'
@@ -91,6 +91,19 @@ export default function CharacterCreator({ show, onClose, userId, onComplete }) 
     if (!name.trim()) { setError('给他起个名字吧'); return }
     setError('')
     setSaving(true)
+      // 👇 新增：先上传图片到 Storage（如果有）
+  let uploadedImageUrl = avatarUrl
+  if (avatarFile) {
+    const uploadedUrl = await uploadCharacterImage(supabase, userId, avatarFile, null)
+    if (uploadedUrl) {
+      uploadedImageUrl = uploadedUrl
+    } else {
+      setError('图片上传失败')
+      setSaving(false)
+      return
+    }
+  }
+  // 👆 新增结束
 
     const selectedTags = tags.map(id => TAG_POOL.find(t => t.id === id)?.label).filter(Boolean)
     const style = SPEECH_STYLES.find(s => s.id === speechStyle)
@@ -112,13 +125,13 @@ export default function CharacterCreator({ show, onClose, userId, onComplete }) 
         
       ],
       playerNickname: playerNickname.trim() || '你',  // 👈 加这行
-  images: {                    // 👈 加上整个 images 对象
-    default: avatarUrl || '',
-    shy: '',
-    intense: '',
-    aftercare: '',
-  },
-    })
+      images: {                    // 👈 加上整个 images 对象
+        default: uploadedImageUrl || '',  // 👈 改成用上传后的 URL
+        shy: '',
+        intense: '',
+        aftercare: '',
+      },
+        })
 
   const result = await saveCustomCharacter(supabase, userId, {
   ...config,
