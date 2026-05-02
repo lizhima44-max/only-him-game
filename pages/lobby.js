@@ -549,7 +549,8 @@ export default function Lobby() {
         <div style={{ position: 'relative', width: '100%', maxWidth: '480px', height: '100%', margin: '0 auto', overflow: 'hidden', fontFamily: 'Georgia, serif' }}>
           
           {/* 背景图 */}
-          <img src="/assets/lobby/lobby_bg.png" alt="" style={{ 
+          {/*<img src="/assets/lobby/lobby_bg.png" alt="" style={{ */}
+          <img src="" alt="" style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%', 
             objectFit: 'cover', pointerEvents: 'none',
             opacity: isDay ? 0.15 : 0.4,

@@ -143,7 +143,8 @@ export default function Home() {
       fontFamily: 'Georgia, serif',
       background: 'var(--bg-main)',
     }}>
-      <img src="/assets/lobby/lobby_bg.png" alt="" style={{
+      {/*<img src="/assets/lobby/lobby_bg.png" alt="" style={{*/}
+      <img src="" alt="" style={{
         position: 'absolute', inset: 0, width: '100%', height: '100%',
         objectFit: 'cover', objectPosition: 'center', zIndex: 0,
         pointerEvents: 'none', opacity: theme === 'day' ? 0.3 : 0.5,
@@ -390,7 +391,8 @@ export default function Home() {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'var(--bg-main)',
       }}>
-        <img src="/assets/lobby/lobby_bg.png" alt="" style={{
+        {/*<img src="/assets/lobby/lobby_bg.png" alt="" style={{*/}
+        <img src="" alt="" style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
           objectFit: 'cover', objectPosition: 'center', zIndex: 0, pointerEvents: 'none',
           opacity: theme === 'day' ? 0.3 : 0.5,
