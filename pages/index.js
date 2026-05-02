@@ -124,12 +124,12 @@ export default function Home() {
   }
 
   const loadingLines = [
-    '他在某个时空，等你很久了。',
-    '有些相遇，是命中注定。',
-    '你听见了吗？他在叫你的名字。',
-    '故事的开头，总是一场意外。',
-    '他说，这次不会再让你走了。',
-    '月光替他藏好了所有秘密。',
+    '❀━━━━━━ 他在某个时空，等你很久了。━━━━━━❀',
+    '∿ ∿ ━━━ ❀ ━━━ ∿ ∿  有些相遇，是命中注定。∿ ∿ ━━━ ❀ ━━━ ∿ ∿  ',
+    '· • ━━━ ✶ ━━━ • · 你听见了吗？他在叫你的名字。· • ━━━ ✶ ━━━ • ·  ',
+    '· ˚ ━━━ ✦ ━━━ ˚ ·故事的开头，总是一场意外。· ˚ ━━━ ✦ ━━━ ˚ ·',
+    ' ✶ · ✶ · ✶他说，这次不会再让你走了。 ✶ · ✶ · ✶',
+    '❦━━━━━━月光替他藏好了所有秘密。━━━━━━❦',
   ]
   const [lineIdx, setLineIdx] = useState(0)
   const [lineFade, setLineFade] = useState(true)
@@ -151,7 +151,7 @@ export default function Home() {
       position: 'fixed', inset: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontFamily: 'Georgia, serif',
-      background: 'var(--bg-main)',
+      background: theme === 'day' ? '#F9F5F2' : '#1B0A1F',
     }}>
       {/*<img src="/assets/lobby/lobby_bg.png" alt="" style={{*/}
       <img src="" alt="" style={{
