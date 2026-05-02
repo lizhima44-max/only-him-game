@@ -29,7 +29,8 @@ export default function CharacterCreator({ show, onClose, userId, onComplete }) 
   const fileRef = useRef(null)
   const [playerNickname, setPlayerNickname] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
-const avatarInputRef = useRef(null)
+  const [avatarFile, setAvatarFile] = useState(null)  // 新增：存文件对象
+  const avatarInputRef = useRef(null)
 
   if (!show) return null
 
@@ -79,12 +80,10 @@ const avatarInputRef = useRef(null)
   
   setError('')
   
-  // 转为 base64 存储（简单方案，不用 Supabase Storage）
-  const reader = new FileReader()
-  reader.onload = (ev) => {
-    setAvatarUrl(ev.target.result)
-  }
-  reader.readAsDataURL(file)
+  // 先预览（用本地 URL，不上传）
+  const previewUrl = URL.createObjectURL(file)
+  setAvatarUrl(previewUrl)
+  setAvatarFile(file)  // 需要新增这个 state
 }
 
   // ── 捏人完成 → 生成config ──
