@@ -13,8 +13,18 @@ export default function Home() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   
-  const [agreedAll, setAgreedAll] = useState(false)
-  const [ageConfirmed, setAgeConfirmed] = useState(false)
+  const [agreedAll, setAgreedAll] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('agreedAll') === 'true'
+    }
+    return false
+  })
+  const [ageConfirmed, setAgeConfirmed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ageConfirmed') === 'true'
+    }
+    return false
+  })
   const [showAgreement, setShowAgreement] = useState(null)
 
   const [theme, setTheme] = useState('day')
@@ -553,7 +563,9 @@ export default function Home() {
                 <input
                   type="checkbox"
                   checked={agreedAll}
-                  onChange={e => setAgreedAll(e.target.checked)}
+                  onChange={e => {setAgreedAll(e.target.checked)
+                  localStorage.setItem('agreedAll', e.target.checked)  
+                  }}
                   style={{
                     width: '16px', height: '16px',
                     accentColor: 'var(--text-accent)',
@@ -579,7 +591,9 @@ export default function Home() {
                 <input
                   type="checkbox"
                   checked={ageConfirmed}
-                  onChange={e => setAgeConfirmed(e.target.checked)}
+                  onChange={e => {setAgeConfirmed(e.target.checked)
+                  localStorage.setItem('ageConfirmed', e.target.checked)  
+                  }}
                   style={{
                     width: '16px', height: '16px',
                     accentColor: 'var(--text-accent)',
