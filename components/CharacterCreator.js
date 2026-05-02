@@ -394,13 +394,22 @@ ${JSON.stringify(allFeatures, null, 2)}
 
 // 辅助函数：从AI回复中提取JSON
 function extractJSON(str) {
+    // 先尝试清理可能损坏的字符
+  let cleaned = str.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ') // 替换控制字符
   let jsonStr = str.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
   const start = jsonStr.indexOf('{')
   const end = jsonStr.lastIndexOf('}')
   if (start !== -1 && end !== -1) {
     jsonStr = jsonStr.slice(start, end + 1)
   }
-  return JSON.parse(jsonStr)
+    try {
+    return JSON.parse(jsonStr)
+  } catch (e) {
+    console.error('[JSON] 解析失败，尝试修复:', e.message)
+    // 二次尝试：移除不合法转义
+    jsonStr = jsonStr.replace(/\\([^"\\/bfnrtu])/g, '$1')
+    return JSON.parse(jsonStr)
+  }
 }
 
   // ── AI分析结果确认保存 ──
