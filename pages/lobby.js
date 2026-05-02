@@ -461,7 +461,62 @@ export default function Lobby() {
 
     const themeColor = selectedChar.theme
     const isDay = theme === 'day'
-    
+    // 骨架屏：数据还没加载完时显示
+    if (allCards.length === 0) {
+      return (
+        <div className={`theme-lobby-${theme}`} style={{
+          position: 'fixed', inset: 0,
+          background: 'var(--bg-main)',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '480px', height: '100%', margin: '0 auto', overflow: 'hidden' }}>
+            <div style={{ position: 'relative', zIndex: 10, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              
+              {/* 顶部标题 */}
+              <div style={{ textAlign: 'center', padding: '32px 20px 8px', flexShrink: 0 }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', letterSpacing: '0.45em', marginBottom: '12px' }}>ONLY HIM</div>
+                <div style={{ fontSize: '32px', color: 'var(--text-primary)', fontStyle: 'italic', letterSpacing: '0.08em' }}>是他</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', letterSpacing: '0.2em', marginTop: '10px', opacity: 0.65 }}>选择你的故事</div>
+              </div>
+
+              {/* 骨架卡片 */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', padding: '20px 0', overflow: 'hidden' }}>
+                {[1, 2, 3].map(i => (
+                  <div key={i} style={{
+                    width: '138px', height: '215px',
+                    borderRadius: '20px',
+                    background: 'var(--card-bg)',
+                    border: '1px solid var(--border-glass)',
+                    opacity: 0.5,
+                  }} />
+                ))}
+              </div>
+
+              {/* 点导航骨架 */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', padding: '12px 0 6px' }}>
+                {[1, 2, 3].map(i => (
+                  <div key={i} style={{
+                    width: '4px', height: '4px', borderRadius: '50%',
+                    background: 'rgba(248,141,167,0.3)',
+                  }} />
+                ))}
+              </div>
+
+              {/* 底部面板骨架 */}
+              <div style={{ flex: 1, marginTop: 'auto', padding: '20px 24px 34px' }}>
+                <div style={{
+                  height: '200px',
+                  borderRadius: '16px',
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--border-glass)',
+                  opacity: 0.5,
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
     return (
       <div style={{
         padding: '20px 24px 34px',
@@ -513,6 +568,7 @@ export default function Lobby() {
   const isDay = theme === 'day'
 
   return (
+    
     <>
       <style jsx global>{`
         .theme-lobby-day {
