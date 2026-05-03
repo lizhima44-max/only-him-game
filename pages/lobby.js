@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabase.js'
 import { useRouter } from 'next/router'
 import { loadApiConfig } from '../lib/apiClient'
 import SettingsPanel from '../components/SettingsPanel'
