@@ -1,3 +1,6 @@
+// pages/lobby.js
+// 强制禁用 Next.js 的自动静态缓存，确保每次访问都是最新的
+export const dynamic = 'force-dynamic';
 import { useEffect, useRef, useState } from 'react'
 //import { supabase } from '../lib/supabase.js'
 // 替换原来的 import
