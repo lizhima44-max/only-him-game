@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 //import { supabase } from '../lib/supabase.js'
 // 替换原来的 import
-// import { supabase } from '../lib/supabase'
-
+import { supabase } from '../lib/supabase'
 // 临时直接创建
-import { createClient } from '@supabase/supabase-js'
-const supabase = createClient(
-  'https://kgikfiifulazucttmiub.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtmaWlmdWxhenVjdHRtaXViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjUwMzksImV4cCI6MjA5MjU0MTAzOX0.o-Oc7ug5rf7FwQTCnEGprBfzTS0qIFqlPq6-vEoKTtU'
-)
+//import { createClient } from '@supabase/supabase-js'
+//const supabase = createClient(
+//  'https://kgikfiifulazucttmiub.supabase.co',
+//  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtmaWlmdWxhenVjdHRtaXViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjUwMzksImV4cCI6MjA5MjU0MTAzOX0.o-Oc7ug5rf7FwQTCnEGprBfzTS0qIFqlPq6-vEoKTtU'
+//)
 import { useRouter } from 'next/router'
 import { loadApiConfig } from '../lib/apiClient'
 import SettingsPanel from '../components/SettingsPanel'
