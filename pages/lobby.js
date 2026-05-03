@@ -197,7 +197,7 @@ export default function Lobby() {
 
   async function handleDeleteCustom(charId, e) {
     e.stopPropagation()
-    if (confirm('确定要删除这个角色吗？')) {
+    if (confirm('「有些陪伴，就到这里了。谢谢你来过。」')) {
       await deleteCustomCharacter(supabase, userId, charId)
       loadCustomChars()
     }
@@ -441,7 +441,7 @@ export default function Lobby() {
                       position: 'absolute', bottom: '10px', right: '12px',
                       background: 'none', border: 'none', color: 'rgba(255,100,100,0.45)',
                       fontSize: '11px', cursor: 'pointer',
-                    }}>删除</button>
+                    }}>和他告别</button>
                   </div>
                 ))}
               </div>

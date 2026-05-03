@@ -147,29 +147,38 @@ export default function Home() {
   }, [loading])
 
   if (loading) return (
-    <div className={`theme-${theme}`} style={{
+    <div style={{
       position: 'fixed', inset: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontFamily: 'Georgia, serif',
       background: theme === 'day' ? '#F9F5F2' : '#1B0A1F',
+      transition: 'background 0.3s ease',
     }}>
-      {/*<img src="/assets/lobby/lobby_bg.png" alt="" style={{*/}
+      {/* 背景图（已禁用） */}
       <img src="" alt="" style={{
         position: 'absolute', inset: 0, width: '100%', height: '100%',
         objectFit: 'cover', objectPosition: 'center', zIndex: 0,
-        pointerEvents: 'none', opacity: theme === 'day' ? 0.3 : 0.5,
+        pointerEvents: 'none', opacity: 0,
       }} />
+      
       <div style={{
-        position: 'relative', zIndex: 10, textAlign: 'center', padding: '0 40px',
+        position: 'relative', zIndex: 10,
+        textAlign: 'center',
+        padding: '0 20px',
+        maxWidth: '280px',
       }}>
         <div style={{
-          fontSize: '13px', color: 'var(--text-primary)',
-          letterSpacing: '0.2em', lineHeight: 2.2,
-          textShadow: theme === 'day' ? 'none' : '0 0 20px rgba(255,141,186,0.3)',
+          fontSize: '13px',
+          color: theme === 'day' ? '#3A3A3A' : '#EDEAF2',
+          letterSpacing: '0.2em',
+          lineHeight: 2.2,
+          textShadow: theme === 'night' ? '0 0 12px rgba(248,141,167,0.8), 0 0 20px rgba(248,141,167,0.5)' : '0 0 2px rgba(0,0,0,0.1)',
           opacity: lineFade ? 1 : 0,
           transform: lineFade ? 'translateY(0)' : 'translateY(6px)',
           transition: 'all 0.6s ease',
-        }}>{loadingLines[lineIdx]}</div>
+        }}>
+          {loadingLines[lineIdx]}
+        </div>
       </div>
     </div>
   )
