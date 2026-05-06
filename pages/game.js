@@ -10,48 +10,12 @@
          PETS, createPet, updatePetDaily, feedPet, bathePet, strokePet,
          getPetContextPrompt, getPetRandomAct } from '../lib/shopAndPet'     
    import { loadCustomCharacter, loadCharacterMemories } from '../lib/characterImport'
-
-const ROOMS = [
-  { id: 'living_room', name: '客厅',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
-    items: '布艺沙发、茶几、落地灯、音响、电视柜、绿植、窗边摇椅' },
-  { id: 'kitchen',     name: '厨房',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
-    items: '灶台、冰箱、水槽、备菜台、悬挂的铜锅铜壶、窗台上的香草盆栽' },
-  { id: 'study',       name: '书房',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
-    items: '深色木书架、皮质书桌椅、台灯、文房四宝、窗边小茶桌、几叠旧书' },
-  { id: 'balcony',     name: '阳台',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
-    items: '藤编躺椅、晾衣架、花架（草莓番茄玫瑰）、小圆桌、风铃' },
-  { id: 'guest_room',  name: '客房',  unlockAt: 0,  luCanFreely: true,  playerKnock: true,
-    items: '单人床、简单衣架、书桌、行李箱、窗边一把椅子——这是他暂住的房间' },
-  { id: 'bathroom',    name: '卫浴',  unlockAt: 0,  luCanFreely: true,  playerKnock: false,
-    items: '浴缸、独立淋浴间、洗手台镜柜、护肤品架、毛巾架、香薰蜡烛' },
-  { id: 'bedroom',     name: '卧室',  unlockAt: 70, luCanFreely: false, playerKnock: false,
-    items: '实木大床、床头柜、梳妆台、衣柜、窗边贵妃椅、淡色窗帘' },
-]
-
-const OUTSIDE_PLACES = [
-  { id: 'park',        name: '公园',   desc: '散步晒太阳' },
-  { id: 'cinema',      name: '电影院', desc: '看场电影' },
-  { id: 'mall',        name: '商场',   desc: '逛逛买买' },
-  { id: 'supermarket', name: '超市',   desc: '采购囤货' },
-  { id: 'seaside',     name: '海边',   desc: '吹风发呆' },
-  { id: 'cafe',        name: '咖啡馆', desc: '坐坐喝杯' },
-]
-
-const SCENE_IMAGES = {
-  living_room: '/assets/scenes/living_room.png',
-  kitchen:     '/assets/scenes/kitchen.png',
-  study:       '/assets/scenes/study_room.png',
-  balcony:     '/assets/scenes/balcony.png',
-  guest_room:  '/assets/scenes/guest_room.png',
-  bathroom:    '/assets/scenes/bathroom.png',
-  bedroom:     '/assets/scenes/bedroom.png',
-}
-
-const SCENE_FALLBACK = {
-  living_room: '#1e1a14', kitchen: '#1a1a10', study: '#0f1a14',
-  balcony: '#101820', guest_room: '#1a1614', bathroom: '#141a1a',
-  bedroom: '#1a1018', outside: '#0f1018',
-}
+   import TopBar from '../components/TopBar'
+   import LocationBar from '../components/LocationBar'
+   import CoreActions from '../components/CoreActions'
+   import { ROOMS, OUTSIDE_PLACES, SCENE_IMAGES, SCENE_FALLBACK } from '../lib/gameConstants'
+   import SideMenu from '../components/SideMenu'
+   import ContactModal from '../components/ContactModal'
 
 // ══════════════════════════════════════════════════════
 //  角色配置（自定义导入时只需替换这个对象）
@@ -177,6 +141,10 @@ export default function Game() {
 }
   const router = useRouter()
   const [user, setUser] = useState(null)
+  // state 区域
+  const [showMenu, setShowMenu] = useState(false)
+  const [showContact, setShowContact] = useState(false)
+  const [daysTogether, setDaysTogether] = useState(1)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -202,7 +170,7 @@ export default function Game() {
   const [newPrankText, setNewPrankText] = useState('')
   const [superTab, setSuperTab] = useState('staple')
   const [importantMemories, setImportantMemories] = useState([])
-const [showMemories, setShowMemories] = useState(false)
+  const [showMemories, setShowMemories] = useState(false)
   const bottomRef = useRef(null)
   const [charLoading, setCharLoading] = useState(true)
 
@@ -217,22 +185,22 @@ const [showMemories, setShowMemories] = useState(false)
   const [selAct, setSelAct] = useState('kiss_lip')
   const [bathAftercare, setBathAftercare] = useState(false) // 浴室专属余温
 
-// ── 冰箱食材 ──
-const defaultFridge = {
-  '鸡蛋': 6, '牛奶': 1, '番茄': 3, '面条': 2, '猪肉': 1,
-  '豆腐': 2, '青菜': 3, '大蒜': 1, '米': 1, '奶酪': 1,
-}
-const [fridge, setFridge] = useState(defaultFridge)
+  // ── 冰箱食材 ──
+  const defaultFridge = {
+    '鸡蛋': 6, '牛奶': 1, '番茄': 3, '面条': 2, '猪肉': 1,
+    '豆腐': 2, '青菜': 3, '大蒜': 1, '米': 1, '奶酪': 1,
+  }
+  const [fridge, setFridge] = useState(defaultFridge)
 
-// ── 书房 ──
-const defaultBookList = [
-  { title: '围城', author: '钱钟书' },
-  { title: '倾城之恋', author: '张爱玲' },
-  { title: '活着', author: '余华' },
-  { title: '人类简史', author: '赫拉利' },
-  { title: '小王子', author: '圣埃克苏佩里' },
-]
-const [bookList, setBookList] = useState(defaultBookList)
+  // ── 书房 ──
+  const defaultBookList = [
+    { title: '围城', author: '钱钟书' },
+    { title: '倾城之恋', author: '张爱玲' },
+    { title: '活着', author: '余华' },
+    { title: '人类简史', author: '赫拉利' },
+    { title: '小王子', author: '圣埃克苏佩里' },
+  ]
+  const [bookList, setBookList] = useState(defaultBookList)
 
   const [diaryList, setDiaryList] = useState([])       // 他写的日记列表
   const [showFridge, setShowFridge] = useState(false)
@@ -265,20 +233,65 @@ const [bookList, setBookList] = useState(defaultBookList)
   const [showWardrobe, setShowWardrobe] = useState(false)
   const [showBedside, setShowBedside] = useState(false)
   // ── 商场/超市/宠物 ──
-const [coins, setCoins] = useState(500)
-const [lastDate, setLastDate] = useState('')
-const [garden, setGarden] = useState([])     // 阳台花盆 [{plantId, plantedDay, watered, stage}]
-const [showGarden, setShowGarden] = useState(false)
-const [pet, setPet] = useState(null)
-const [showShop, setShowShop] = useState(false)
-const [showSupermarket, setShowSupermarket] = useState(false)
-const [showPetPanel, setShowPetPanel] = useState(false)
-const [showAdopt, setShowAdopt] = useState(false)
-const [shopTab, setShopTab] = useState('his')
-const [petNameInput, setPetNameInput] = useState('')
-const [adoptingType, setAdoptingType] = useState(null)
-const [cart, setCart] = useState([])
-const aiTimerRef = useRef(null)
+  const [coins, setCoins] = useState(500)
+  const [lastDate, setLastDate] = useState('')
+  const [garden, setGarden] = useState([])     // 阳台花盆 [{plantId, plantedDay, watered, stage}]
+  const [showGarden, setShowGarden] = useState(false)
+  const [pet, setPet] = useState(null)
+  const [showShop, setShowShop] = useState(false)
+  const [showSupermarket, setShowSupermarket] = useState(false)
+  const [showPetPanel, setShowPetPanel] = useState(false)
+  const [showAdopt, setShowAdopt] = useState(false)
+  const [shopTab, setShopTab] = useState('his')
+  const [petNameInput, setPetNameInput] = useState('')
+  const [adoptingType, setAdoptingType] = useState(null)
+  const [cart, setCart] = useState([])
+  const aiTimerRef = useRef(null)
+  const [theme, setTheme] = useState('day')
+  const [locationState, setLocationState] = useState('home') // 'home' 在家，'out' 外出
+  const [showRoomPanel, setShowRoomPanel] = useState(false)
+
+    // 迁移函数（组件内部）
+  const migrateBedsideAndFridge = (bedsideList, fridgeObj) => {
+    let newBedside = bedsideList || [];
+    const newFridge = { ...fridgeObj };
+    const itemsToMove = [
+      { fridgeKey: '卫生巾', bedId: 'pads' },
+      { fridgeKey: '安全措施', bedId: 'condom' },
+    ];
+    itemsToMove.forEach(({ fridgeKey, bedId }) => {
+      if (newFridge[fridgeKey]) {
+        const qty = newFridge[fridgeKey];
+        const existing = newBedside.find(b => b.id === bedId);
+        if (existing) existing.qty += qty;
+        else newBedside.push({ id: bedId, qty });
+        delete newFridge[fridgeKey];
+      }
+    });
+    if (newBedside.length > 0 && typeof newBedside[0] === 'string') {
+      newBedside = newBedside.map(id => ({ id, qty: 1 }));
+    }
+    return { bedside: newBedside, fridge: newFridge };
+  };
+
+  // 事件处理函数区域
+  const handleOpenMenu = () => setShowMenu(true)
+  const handleCloseMenu = () => setShowMenu(false)
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+  const handleOpenMemories = () => setShowMemories(true)
+  const handleOpenGarden = () => setShowGarden(true)
+  const handleOpenPet = () => setShowPetPanel(true)
+  const handleOpenFridge = () => setShowFridge(true)
+  const handleOpenWardrobe = () => setShowWardrobe(true)
+  const handleOpenShop = () => setShowShop(true)
+  const handleOpenCalendar = () => setShowCalendar(true)
+  const handleChangeAvatar = () => {
+    alert('更换头像功能可以在角色创造器中修改，或后续单独实现')
+  }
+  const handleContact = () => setShowContact(true)
 
 useEffect(() => {
   supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -408,6 +421,14 @@ useEffect(() => {
     const isReturningUser = data && data.chat_history && data.chat_history.length > 0
 
     if (isReturningUser) {
+            // 👇 迁移旧数据
+      const { bedside: migratedBedside, fridge: migratedFridge } = migrateBedsideAndFridge(
+        data.bedside_items,
+        data.fridge && Object.keys(data.fridge).length > 0 ? data.fridge : defaultFridge
+      );
+      // 使用迁移后的值
+      setFridge(migratedFridge);
+      setBedsideItems(migratedBedside);
       setIntimacy(data.intimacy || 0)
       setPlayerRoom(data.current_room || 'living_room')
       setLuRoom(data.lu_location || 'guest_room')
@@ -423,7 +444,6 @@ useEffect(() => {
       setPeriodDays(data.period_days || [])
       setIsPeriodNow(data.is_period || false)
       setDiaryList(data.diary_list || [])
-      setFridge(data.fridge && Object.keys(data.fridge).length > 0 ? data.fridge : defaultFridge)
       setBookList(data.book_list?.length > 0 ? data.book_list : defaultBookList)
       setCandleLit(data.candle_lit || false)
       setCoins(data.coins ?? 500)
@@ -489,6 +509,12 @@ useEffect(() => {
   })
 }, [])
 
+
+useEffect(() => {
+  const hour = new Date().getHours()
+  setTheme(hour >= 6 && hour < 18 ? 'day' : 'night')
+}, [])
+
   // 新用户不再需要进门页
 
   useEffect(() => {
@@ -514,6 +540,34 @@ useEffect(() => {
   }, [])
 
   useEffect(() => () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current) }, [])
+
+  useEffect(() => {
+    // 只在客户端执行
+    if (typeof window !== 'undefined') {
+      let startDate = localStorage.getItem('game_start_date')
+      if (!startDate) {
+        startDate = new Date().toISOString().slice(0, 10)
+        localStorage.setItem('game_start_date', startDate)
+      }
+      setDaysTogether(calculateDaysTogether(startDate))
+    }
+  }, [])  // 空数组，只在组件挂载时执行一次
+
+  // 好感度等级转换
+  const getIntimacyLevel = (intimacy) => {
+    if (intimacy >= 90) return { level: 'Lv.5', stage: '热恋期' }
+    if (intimacy >= 70) return { level: 'Lv.4', stage: '沉溺期' }
+    if (intimacy >= 50) return { level: 'Lv.3', stage: '心动期' }
+    if (intimacy >= 30) return { level: 'Lv.2', stage: '好感期' }
+    return { level: 'Lv.1', stage: '相识期' }
+  }
+
+  // 计算陪伴天数（纯函数，不直接调用 localStorage）
+  const calculateDaysTogether = (startDateStr) => {
+    if (!startDateStr) return 1
+    const diff = Math.floor((new Date() - new Date(startDateStr)) / (1000 * 60 * 60 * 24))
+    return diff + 1
+  } 
 
 async function saveToDb(msgs, intim, pRoom, lRoom, uid, wk, rom) {
   const id = uid || userId
@@ -726,6 +780,44 @@ async function generateOpening(customChar, playerNickname) {
       saveToDb(messages, intimacy, roomId, luRoom)
     }
   }
+    // 场景栏选择房间（复用原有的 handleRoomChange）
+  const handleSelectRoom = (roomId) => {
+    handleRoomChange(roomId)
+  }
+
+  // 场景栏选择地点
+  const handleSelectPlace = (placeId) => {
+    const place = OUTSIDE_PLACES.find(p => p.id === placeId)
+    if (!place) return
+    setPlayerRoom('outside')
+    setOutsidePlace(placeId)
+    sendToAI(
+      `你们一起去了${place.name}，描述一下刚到场景`,
+      messages, intimacy, 'outside', luRoom, false, undefined, true
+    )
+  }
+
+// 切换在家/在外
+const handleToggleLocation = () => {
+  if (locationState === 'home') {
+    setLocationState('out')
+  } else {
+    // 获取当前外出地点的名称
+    const currentPlace = OUTSIDE_PLACES.find(p => p.id === outsidePlace)
+    const placeName = currentPlace?.name || '外面'
+
+    // 回家：切换场景
+    setPlayerRoom('living_room')
+    setOutsidePlace(null)
+    setLocationState('home')
+
+    // 发送 AI 消息，让它知道一起从某处回来
+    sendToAI(
+      `（你们从${placeName}一起回到家）你自然地对她说一句话，接续刚才在外面的话题，语气平常，`,
+      messages, intimacy, 'living_room', luRoom, false, undefined, true
+    )
+  }
+}
 
   function handleGoOutside(placeId) {
     const place = OUTSIDE_PLACES.find(p => p.id === placeId)
@@ -759,6 +851,57 @@ async function generateOpening(customChar, playerNickname) {
     }
   }
 
+  // 生成做点什么面板的按钮列表
+function getRoomActions(playerRoom, isOutside, outsidePlace, sameRoom, pet, fridge, setShowFridge, setShowBooks, setShowDiary, setShowMemories, setShowWardrobe, setShowBedside, setShowGarden, setShowPetPanel, setShowShop, setShowSupermarket, intimacy, sendToAI, messages, setExpandedAction, importantMemories) {
+  // 在家时的房间动作
+  const roomActionsMap = {
+    living_room: [
+      { label: '泡茶', prompt: '她去泡了杯茶，你注意到了，说一句' },
+      { label: '看电视', prompt: '她窝在沙发开始看电视，你在旁边，随口说一句' },
+      { label: '发呆', prompt: '她在客厅发呆，你看见了，说一句' },
+      { label: pet ? (pet.name + ' ' + (PETS.find(p => p.id === pet.typeId)?.emoji || '🐾')) : '🐾 领养宠物', special: 'pet' },
+    ],
+    kitchen: [
+      { label: '一起做饭', special: 'cook' },
+      { label: '冰箱', special: 'fridge' },
+    ],
+    study: [
+      { label: '看书', special: 'books' },
+      { label: '打扰他', prompt: '她故意进书房打扰你，你的反应，一句话' },
+      { label: '他的日记', special: 'diary' },
+      { label: '📖 重要回忆', special: 'memories' },
+    ],
+    balcony: [
+      { label: '看星星', prompt: '她在阳台看星星，你跟出来了，说一句' },
+      { label: '🌱 花园', special: 'garden' },
+    ],
+    guest_room: [
+      { label: '坐会儿', prompt: '她进了客房坐下，你坐在对面，说一句' },
+    ],
+    bedroom: [
+      { label: '躺一躺', prompt: '她走进卧室躺下，你站在门口，说一句' },
+      { label: '说说话', prompt: '卧室里安静，她想和你说说话，你的反应' },
+      { label: '衣帽间', special: 'wardrobe' },
+      { label: '床头柜', special: 'bedside' },
+    ],
+  }
+
+  // 外出地点动作
+  const outsideActionsMap = {
+    park:        [{ label: '散步', prompt: '你们在公园散步，你走在她旁边，说一句' }, { label: '坐草地', prompt: '她突然坐到草地上，你站在旁边，说一句' }],
+    cinema:      [{ label: '挑电影', prompt: '你们站在影院门口选电影，你说一句' }, { label: '买爆米花', prompt: '她去买爆米花，你跟着，说一句' }],
+    mall:        [{ label: '逛逛', prompt: '她在商场橱窗前停下来，你说一句' }, { label: '🛍️ 逛商场', special: 'shop' }, { label: '帮我提包', prompt: '她把袋子塞给你，你接过来，说一句' }],
+    supermarket: [{ label: '推车', prompt: '你接过了超市的购物车，说一句' }, { label: '🛒 采购', special: 'supermarket' }, { label: '挑东西', prompt: '她拿起什么东西在研究，你凑过去，说一句' }],
+    seaside:     [{ label: '吹风', prompt: '海边的风把她头发吹乱了，你看着，说一句' }, { label: '捡贝壳', prompt: '她蹲下来捡贝壳，你站在旁边，说一句' }],
+    cafe:        [{ label: '点单', prompt: '服务员来了，她在想点什么，你替她说了一句' }, { label: '发呆', prompt: '咖啡馆里很安静，你们都有点发呆，你先开口' }],
+  }
+
+  if (!isOutside) {
+    return roomActionsMap[playerRoom] || []
+  } else {
+    return outsideActionsMap[outsidePlace] || []
+  }
+}
   // ══════════════════════════════════════════
   //  亲密小游戏函数
   // ══════════════════════════════════════════
@@ -1006,7 +1149,15 @@ setCoins(prev => prev + 50)
   const currentSceneImg = isOutside ? null : SCENE_IMAGES[playerRoom]
   const currentImgLoaded = isOutside ? true : imgLoaded[playerRoom]
   const currentFallback = SCENE_FALLBACK[playerRoom] || '#0f0c09'
-
+  const btnStyle = (active = false) => ({
+    flexShrink: 0, padding: '6px 14px',
+    background: active ? 'var(--btn-hover-bg)' : 'var(--btn-bg)',
+    border: `1px solid ${active ? '#F88DA7' : 'var(--btn-border)'}`,
+    borderRadius: '20px',
+    color: active ? '#F88DA7' : 'var(--btn-text)',
+    fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+    fontFamily: 'Georgia, serif', letterSpacing: '0.05em', transition: 'all 0.2s',
+  })
   // ── 开场 ──
   // ── 主界面 ──
   return (
@@ -1030,27 +1181,23 @@ setCoins(prev => prev + 50)
         }
         select, option { background: #12100e !important; color: #e8dcc8 !important; }
       `}</style>
-      <div style={{
-        position: 'fixed', inset: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#0f0c09',
-      }}>
-      <div style={{
-        position: 'relative', width: '100%', maxWidth: '480px', height: '100%',
-        overflow: 'hidden', fontFamily: 'Georgia, serif',
-      }}>
+      <div className={`game-root theme-${theme}`}>
+        <div style={{
+          position: 'relative', width: '100%', maxWidth: '480px', height: '100%',
+          overflow: 'hidden', fontFamily: 'Georgia, serif',
+        }}>
 
       {/* ── 第1层：场景背景 ── */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 10,
-        background: currentFallback, transition: 'background 0.6s ease',
+        background: 'var(--bg-main)', transition: 'background 0.6s ease',
       }}>
         {currentSceneImg && !currentImgLoaded && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{
               width: '28px', height: '28px', borderRadius: '50%',
               border: '2px solid rgba(201,169,110,0.15)',
-              borderTopColor: 'rgba(201,169,110,0.5)',
+              borderTopcolor: 'var(--text-accent, #F88DA7)',
               animation: 'spin 1s linear infinite',
             }} />
           </div>
@@ -1072,134 +1219,33 @@ setCoins(prev => prev + 50)
         )}
       </div>
 
-      {/* ── 第2层：立绘（预留大图位）── */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 20, pointerEvents: 'none' }} />
-
-      {/* ── 第3层：特效（预留）── */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 30, pointerEvents: 'none' }} />
-
-      {/* ── 第4层：UI ── */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 40,
-        display: 'flex', flexDirection: 'column', color: '#e8dcc8',
+        display: 'flex', flexDirection: 'column', color: 'var(--text-primary, #e8dcc8)',
       }}>
 
-{/* 顶部 */}
-<div style={{
-  padding: '12px 16px 8px',
-  background: 'linear-gradient(to bottom, rgba(8,6,4,0.88), rgba(8,6,4,0))',
-  flexShrink: 0,
-}}>
-  {/* 第一行：头像 + 名字 + 好感度 + 房间切换 */}
-  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-    {/* 头像（如果有上传） */}
-    {CHARACTER_CONFIG.images?.default&& CHARACTER_CONFIG.images.default !== '' && (
-      <img 
-        src={CHARACTER_CONFIG.images.default} 
-        alt="头像"
-        style={{
-          width: '28px',
-          height: '28px',
-          borderRadius: '50%',
-          objectFit: 'cover',
-          border: '1px solid rgba(201,169,110,0.4)',
-          backgroundColor: 'rgba(0,0,0,0.3)',
-          boxShadow: '0 0 8px rgba(201,169,110,0.2)',
-        }}
-      />
-    )}
-    
-    {/* 名字 */}
-    <div style={{ fontSize: '16px', color: '#c9a96e', fontWeight: 'bold', letterSpacing: '0.05em', flexShrink: 0 }}>
-      {CHARACTER_CONFIG.name}
-    </div>
-    
-    {/* 好感度星星 */}
-    <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', flexShrink: 0 }}>
-      {'♥'.repeat(intimacyStars)}{'♡'.repeat(5 - intimacyStars)}
-      <span style={{ marginLeft: '4px', fontSize: '10px', color: 'rgba(201,169,110,0.28)' }}>{intimacy}</span>
-    </div>
-    
-    {/* 房间切换按钮 */}
-    <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
-      {ROOMS.map(room => {
-        const active = playerRoom === room.id
-        return (
-          <button key={room.id} onClick={() => handleRoomChange(room.id)} style={{
-            padding: '3px 7px', fontSize: '11px', background: 'none', border: 'none',
-            borderBottom: active ? '1px solid rgba(201,169,110,0.7)' : '1px solid transparent',
-            color: active ? '#c9a96e' : 'rgba(255,255,255,0.28)',
-            cursor: 'pointer', letterSpacing: '0.03em', transition: 'all 0.2s',
-          }}>{room.name}</button>
-        )
-      })}
-      <button onClick={() => setShowOutside(true)} style={{
-        padding: '3px 7px', fontSize: '11px', background: 'none', border: 'none',
-        borderBottom: isOutside ? '1px solid rgba(201,169,110,0.7)' : '1px solid transparent',
-        color: isOutside ? '#c9a96e' : 'rgba(255,255,255,0.28)',
-        cursor: 'pointer', letterSpacing: '0.03em',
-      }}>外出</button>
-    </div>
-  </div>
-
-  {/* 第二行：位置 + 设置按钮 */}
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '5px' }}>
-    <div style={{
-      fontSize: '10px', color: 'rgba(201,169,110,0.65)',
-      textShadow: '0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8)',
-    }}>
-      {luMoving
-        ? <span style={{ color: 'rgba(201,169,110,0.8)' }}>他在移动…</span>
-        : isOutside ? `· ${currentPlace?.name || '外出中'}`
-        : sameRoom ? '· 同处' : `他在${ROOMS.find(r => r.id === luRoom)?.name}`}
-    </div>
-    
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      {!sameRoom && !isOutside && !luMoving && (
-        <button onClick={handleCallLu} style={{
-          fontSize: '10px', background: 'none',
-          border: '1px solid rgba(201,169,110,0.2)',
-          color: 'rgba(201,169,110,0.55)', padding: '3px 10px',
-          borderRadius: '20px', cursor: 'pointer', letterSpacing: '0.05em',
-        }}>叫他过来</button>
-      )}
-      <button onClick={() => setShowSettings(true)} style={{
-        fontSize: '9px', background: 'none', border: '1px solid rgba(201,169,110,0.15)',
-        color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
-        letterSpacing: '0.05em', padding: '3px 8px', borderRadius: '12px',
-      }}>⚙</button>
-      
-      <button onClick={() => setShowCalendar(true)} style={{
-        fontSize: '9px', background: 'none',
-        border: '1px solid rgba(201,169,110,0.15)',
-        color: 'rgba(201,169,110,0.45)', cursor: 'pointer',
-        padding: '3px 8px', borderRadius: '12px',
-      }}>📅</button>
-      
-      <button onClick={async () => {
-        await supabase.auth.signOut()
-        router.push('/')
-      }} style={{
-        fontSize: '9px', background: 'none', border: 'none',
-        color: 'rgba(255,255,255,0.2)', cursor: 'pointer',
-        letterSpacing: '0.05em', padding: '2px 0',
-        textShadow: '0 1px 3px rgba(0,0,0,0.9)',
-      }}>登出</button>
-    </div>
-  </div>
-</div>
+        <TopBar
+          characterName={CHARACTER_CONFIG.name}
+          intimacy={intimacy}
+          intimacyLevel={getIntimacyLevel(intimacy).level}
+          intimacyStage={getIntimacyLevel(intimacy).stage}
+          daysTogether={daysTogether}
+          coins={coins}
+          locationState={locationState}
+          onToggleLocation={handleToggleLocation}
+          onMenuClick={handleOpenMenu}
+          avatarUrl={CHARACTER_CONFIG.images?.default}
+        />
 
         {/* 对话区 */}
         <div style={{
           flex: 1, overflowY: 'auto', padding: '0 16px 16px',
           display: 'flex', flexDirection: 'column', gap: '10px',
-          maskImage: 'linear-gradient(to bottom, transparent 0%, black 18%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 18%)',
         }}>
           <div style={{ flex: 1 }} />
             {messages.map((m, i) => {
             if (m.role === 'system') return (
-              <div key={i} style={{ alignSelf: 'center', fontSize: '10px', color: 'rgba(201,169,110,0.25)', letterSpacing: '0.12em', padding: '2px 0' }}>{m.content}</div>
+              <div key={i} style={{ alignSelf: 'center', fontSize: '10px', color: 'var(--text-secondary, rgba(201,169,110,0.6))', letterSpacing: '0.12em', padding: '2px 0' }}>{m.content}</div>
             )
             const isLastUser = m.role === 'user' && i === messages.length - 2
             const isIntimate = !!m.intimate  // 亲密消息用斜体
@@ -1213,15 +1259,16 @@ setCoins(prev => prev + 50)
                 <div style={{
                   background: isIntimate
                     ? 'rgba(8,5,3,0.88)'
-                    : m.role === 'user' ? 'rgba(26,40,32,0.82)' : 'rgba(12,9,6,0.82)',
+                        : 'var(--message-bg-assistant)',   // 统一使用 AI 的背景
                   border: isIntimate
-                    ? '1px solid rgba(201,169,110,0.06)'
+                    ? '1px solid var(--border-glass, rgba(201,169,110,0.06))'
                     : m.role === 'user'
-                    ? '1px solid rgba(37,56,48,0.5)'
-                    : '1px solid rgba(201,169,110,0.08)',
+                   // ? '1px solid var(--message-border-glass, rgba(37,56,48,0.5))'
+                   ? '1px solid var(--text-accent, #F88DA7)'   // 用户气泡使用粉色边框
+                    : '1px solid var(--border-glass, rgba(201,169,110,0.08))',
                   borderRadius: m.role === 'user' ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
                   padding: '9px 13px', fontSize: isIntimate ? '13px' : '14px', lineHeight: '1.8',
-                  color: m.role === 'user' ? '#a0c0b0' : '#e8dcc8',
+                  color: 'var(--message-text-assistant)',      // 统一使用 AI 的文字颜色
                   fontStyle: isIntimate ? 'italic' : 'normal',
                   backdropFilter: 'blur(10px)',isolation: 'isolate'
                 }}>
@@ -1234,22 +1281,21 @@ setCoins(prev => prev + 50)
                 </div>
                 {isLastUser && (
                   <div onClick={handleRetract} style={{
-                    fontSize: '10px', color: 'rgba(201,169,110,0.65)', marginTop: '3px',
+                    fontSize: '10px', color: 'var(--text-secondary)', marginTop: '3px',
                     textAlign: 'right', cursor: 'pointer', letterSpacing: '0.05em',
-                    textShadow: '0 1px 4px rgba(0,0,0,0.9)',
                   }}>撤回重说</div>
                 )}
                 {/* 👇 加时间戳 */}
                 {m.timestamp && (
                   <div style={{
                     fontSize: '9px',
-                    color: 'rgba(201,169,110,0.35)',
-                    textAlign: 'right',  // 👈 改成 right
+                    color: 'var(--text-secondary, rgba(201,169,110,0.5))',
+                    textAlign: 'right',
                     marginTop: '2px',
                   }}>
                     {m.timestamp}
                   </div>
-               )}
+                )}
               </div>
             )
           })}
@@ -1261,241 +1307,58 @@ setCoins(prev => prev + 50)
           <div ref={bottomRef} />
         </div>
 
+        <LocationBar
+          locationState={locationState}
+          rooms={ROOMS}
+          places={OUTSIDE_PLACES}
+          currentRoomId={playerRoom}
+          currentPlaceId={outsidePlace}
+          onSelectRoom={handleSelectRoom}
+          onSelectPlace={handleSelectPlace}
+        />
+
         {/* 输入区 + 破次元立绘 */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           {/* ── 互动按钮行 + 输入框 ── */}
           <div style={{
-            background: 'linear-gradient(to top, rgba(8,6,4,0.97) 60%, rgba(8,6,4,0) 100%)',
+            background: 'var(--input-area-bg)',
             flexShrink: 0,
           }}>
             {/* 互动按钮主行 */}
-            <div className="action-row" style={{
-              display: 'flex', gap: '6px', padding: '8px 14px 4px',
-              overflowX: 'auto', scrollbarWidth: 'none',
-            }}>
-              {/* 腻歪 */}
-              <button
-                onClick={() => setExpandedAction(expandedAction === 'niwai' ? null : 'niwai')}
-                style={{
-                  flexShrink: 0, padding: '6px 14px',
-                  background: expandedAction === 'niwai' ? 'rgba(201,169,110,0.2)' : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${expandedAction === 'niwai' ? 'rgba(201,169,110,0.4)' : 'rgba(201,169,110,0.12)'}`,
-                  borderRadius: '20px', color: expandedAction === 'niwai' ? '#c9a96e' : 'rgba(201,169,110,0.55)',
-                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',isolation: 'isolate',
-                  fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
-                  transition: 'all 0.2s',
-                }}
-              >腻歪</button>
-
-              {/* 恶作剧 */}
-              <button
-                onClick={() => setExpandedAction(expandedAction === 'prank' ? null : 'prank')}
-                style={{
-                  flexShrink: 0, padding: '6px 14px',
-                  background: expandedAction === 'prank' ? 'rgba(201,169,110,0.2)' : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${expandedAction === 'prank' ? 'rgba(201,169,110,0.4)' : 'rgba(201,169,110,0.12)'}`,
-                  borderRadius: '20px', color: expandedAction === 'prank' ? '#c9a96e' : 'rgba(201,169,110,0.55)',
-                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',isolation: 'isolate',
-                  fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
-                  transition: 'all 0.2s',
-                }}
-              >恶作剧</button>
-
-              {/* 分隔 */}
-              <div style={{ width: '1px', background: 'rgba(201,169,110,0.1)', flexShrink: 0, margin: '4px 2px' }} />
-
-              {/* 当前房间专属按钮 */}
-              {!isOutside && (() => {
-                const roomActions = {
-                  living_room: [
-                    { label: '泡茶', prompt: '她去泡了杯茶，你注意到了，说一句' },
-                    { label: '看电视', prompt: '她窝在沙发开始看电视，你在旁边，随口说一句' },
-                    { label: '发呆', prompt: '她在客厅发呆，你看见了，说一句' },
-                    { label: pet ? (pet.name + ' ' + (PETS.find(p => p.id === pet.typeId)?.emoji || '🐾')) : '🐾 领养宠物', special: 'pet' },
-                  ],
-                  kitchen: [
-                    { label: '一起做饭', special: 'cook' },
-                    { label: '冰箱', special: 'fridge' },
-                  ],
-                  study: [
-                    { label: '看书', special: 'books' },
-                    { label: '打扰他', prompt: '她故意进书房打扰你，你的反应，一句话' },
-                    { label: '他的日记', special: 'diary' },
-                    { label: '📖 重要回忆', special: 'memories' },  // 👈 加这一行
-                  ],
-                  balcony: [
-                    { label: '看星星', prompt: '她在阳台看星星，你跟出来了，说一句' },
-                    { label: '🌱 花园', special: 'garden' },
-                  ],
-                  guest_room: [
-                    { label: '坐会儿', prompt: '她进了客房坐下，你坐在对面，说一句' },
-                  ],
-                  bedroom: [
-                    { label: '躺一躺', prompt: '她走进卧室躺下，你站在门口，说一句' },
-                    { label: '说说话', prompt: '卧室里安静，她想和你说说话，你的反应' },
-                    { label: '衣帽间', special: 'wardrobe' },
-                    { label: '床头柜', special: 'bedside' },
-                  ],
-                }
-                const acts = roomActions[playerRoom] || []
-                // 通用按钮样式
-                const btnStyle = (active = false) => ({
-                  flexShrink: 0, padding: '6px 14px',
-                  background: active ? 'rgba(201,169,110,0.18)' : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${active ? 'rgba(201,169,110,0.4)' : 'rgba(201,169,110,0.12)'}`,
-                  borderRadius: '20px',
-                  color: active ? '#c9a96e' : 'rgba(201,169,110,0.55)',
-                  fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)',isolation: 'isolate',
-                  fontFamily: 'Georgia, serif', letterSpacing: '0.05em', transition: 'all 0.2s',
-                })
-                return (
-                  <>
-                    {acts.map(a => {
-                      if (a.special === 'pet') {
-  return (
-    <button key="pet" onClick={() => setShowPetPanel(true)} style={btnStyle()}>
-      {a.label}
-    </button>
-  )
-}
-                      if (a.special === 'fridge') return (
-                        <button key="fridge" onClick={() => setShowFridge(true)} style={btnStyle()}>冰箱</button>
-                      )
-                      if (a.special === 'cook') return (
-                        <button key="cook" onClick={() => {
-                          if (!sameRoom) { setToast('他不在厨房'); return }
-                          setShowFridge('cook')
-                        }} style={btnStyle()}>一起做饭</button>
-                      )
-                      if (a.special === 'books') return (
-                        <button key="books" onClick={() => setShowBooks(true)} style={btnStyle()}>看书</button>
-                      )
-                      if (a.special === 'diary') return (
-                        <button key="diary" onClick={() => setShowDiary(true)} style={btnStyle()}>他的日记</button>
-                      )
-// 👇 加这一段
-if (a.special === 'memories') return (
-  <button key="memories" onClick={() => setShowMemories(true)} style={btnStyle()}>
-    📖 重要回忆
-    {importantMemories.length > 0 && (
-      <span style={{ marginLeft: '4px', fontSize: '9px', color: 'rgba(201,169,110,0.6)' }}>
-        ({importantMemories.length})
-      </span>
-    )}
-  </button>
-)
-                      if (a.special === 'wardrobe') return (
-                        <button key="wardrobe" onClick={() => setShowWardrobe(true)} style={btnStyle()}>衣帽间</button>
-                      )
-                      if (a.special === 'bedside') return (
-                        <button key="bedside" onClick={() => setShowBedside(true)} style={btnStyle()}>床头柜</button>
-                      )
-                      if (a.special === 'garden') return (
-                        <button key="garden" onClick={() => setShowGarden(true)} style={btnStyle()}>🌱 花园</button>
-                      )
-                      return (
-                        <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                          style={btnStyle()}
-                        >{a.label}</button>
-                      )
-                    })}
-                    {/* 书房：他在书房时显示"他似乎在写什么"（纯氛围，不可点） */}
-                    {playerRoom === 'study' && luRoom === 'study' && (
-                      <span style={{ fontSize: '10px', color: 'rgba(201,169,110,0.2)', fontStyle: 'italic', padding: '0 4px' }}>他似乎在写什么…</span>
-                    )}
-                    {/* 浴室：入口，不需要同处（自己在浴室也可以） */}
-                    {playerRoom === 'bathroom' && (
-                      <button onClick={() => setExpandedAction(expandedAction === 'bath' ? null : 'bath')}
-                        style={btnStyle(expandedAction === 'bath')}
-                      >浴室互动</button>
-                    )}
-                    {/* 卧室：需同处才显示 */}
-                    {playerRoom === 'bedroom' && sameRoom && (
-                      <button onClick={() => setExpandedAction(expandedAction === 'bedroom_intimate' ? null : 'bedroom_intimate')}
-                        style={btnStyle(expandedAction === 'bedroom_intimate')}
-                      >卧室氛围</button>
-                    )}
-                  </>
-                )
-              })()}
-
-              {/* 外出专属 */}
-              {isOutside && (() => {
-                const outsideActions = {
-                  park:        [{ label: '散步', prompt: '你们在公园散步，你走在她旁边，说一句' }, { label: '坐草地', prompt: '她突然坐到草地上，你站在旁边，说一句' }],
-                  cinema:      [{ label: '挑电影', prompt: '你们站在影院门口选电影，你说一句' }, { label: '买爆米花', prompt: '她去买爆米花，你跟着，说一句' }],
-                  mall: [
-                          { label: '逛逛', prompt: '她在商场橱窗前停下来，你说一句' },
-                          { label: '🛍️ 逛商场', special: 'shop' },
-                          { label: '帮我提包', prompt: '她把袋子塞给你，你接过来，说一句' },
-                        ],
-                  supermarket: [
-                          { label: '推车', prompt: '你接过了超市的购物车，说一句' },
-                          { label: '🛒 采购', special: 'supermarket' },
-                          { label: '挑东西', prompt: '她拿起什么东西在研究，你凑过去，说一句' },
-                        ],
-                  seaside:     [{ label: '吹风', prompt: '海边的风把她头发吹乱了，你看着，说一句' }, { label: '捡贝壳', prompt: '她蹲下来捡贝壳，你站在旁边，说一句' }],
-                  cafe:        [{ label: '点单', prompt: '服务员来了，她在想点什么，你替她说了一句' }, { label: '发呆', prompt: '咖啡馆里很安静，你们都有点发呆，你先开口' }],
-                }
-                const acts = outsideActions[outsidePlace] || []
-                return acts.map(a => {
-  if (a.special === 'shop') {
-    return (
-      <button key="shop" onClick={() => setShowShop(true)} style={{
-        flexShrink: 0, padding: '6px 14px',
-        background: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(201,169,110,0.12)',
-        borderRadius: '20px', color: 'rgba(201,169,110,0.55)',
-        fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)', isolation: 'isolate',
-        fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
-      }}>🛍️ 逛商场</button>
-    )
-  }
-  if (a.special === 'supermarket') {
-    return (
-      <button key="supermarket" onClick={() => setShowSupermarket(true)} style={{
-        flexShrink: 0, padding: '6px 14px',
-        background: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(201,169,110,0.12)',
-        borderRadius: '20px', color: 'rgba(201,169,110,0.55)',
-        fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)', isolation: 'isolate',
-        fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
-      }}>🛒 采购</button>
-    )
-  }
-  return (
-    <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)} style={{
-      flexShrink: 0, padding: '6px 14px',
-      background: 'rgba(255,255,255,0.06)',
-      border: '1px solid rgba(201,169,110,0.12)',
-      borderRadius: '20px', color: 'rgba(201,169,110,0.55)',
-      fontSize: '12px', cursor: 'pointer', backdropFilter: 'blur(8px)', isolation: 'isolate',
-      fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
-    }}>{a.label}</button>
-  )
-})
-              })()}
+            <div style={{ marginTop: '2px' }}>
+              <div className="action-row" style={{
+                display: 'flex', gap: '6px', padding: '8px 14px 4px',
+                overflowX: 'auto', scrollbarWidth: 'none',
+              }}>
+                {/* 腻歪 */}
+                <CoreActions
+                  onNiwai={() => setExpandedAction(expandedAction === 'niwai' ? null : 'niwai')}
+                  onPrank={() => setExpandedAction(expandedAction === 'prank' ? null : 'prank')}
+                  onRoomAction={() => setShowRoomPanel(prev => !prev)}   // 改为打开面板
+                  expandedAction={expandedAction}   // 新增这一行
+                  showRoomPanel={showRoomPanel}
+                />
+              </div>
             </div>
-
             {/* 展开面板：腻歪 */}
             {expandedAction === 'niwai' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
-                border: '1px solid rgba(201,169,110,0.12)',
+                background: 'var(--panel-bg, var(--panel-bg))', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
+                border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
                 {!sameRoom ? (
-                  <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', textAlign: 'center', padding: '8px 0' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-accent, #F88DA7)', textAlign: 'center', padding: '8px 0' }}>
                     他不在这里 ·
                     <span
                       onClick={() => { setExpandedAction(null); handleCallLu() }}
-                      style={{ color: '#c9a96e', cursor: 'pointer', marginLeft: '6px', textDecoration: 'underline' }}
+                      style={{ color: 'var(--text-accent, #c9a96e)', cursor: 'pointer', marginLeft: '6px', textDecoration: 'underline' }}
                     >叫他过来</span>
                   </div>
                 ) : (
                   <>
-                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', letterSpacing: '0.15em', marginBottom: '8px' }}>腻歪一下</div>
+                     {/*<div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', letterSpacing: '0.15em', marginBottom: '8px' }}>腻歪一下</div>*/}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       {[
                         { label: '蹭蹭脸', prompt: '她把脸凑过来蹭了你一下，你的反应，一句话' },
@@ -1507,8 +1370,8 @@ if (a.special === 'memories') return (
                         { label: '说悄悄话', prompt: '她凑到你耳边说了句悄悄话，你的反应' },
                         { label: '捏捏脸', prompt: '她伸手捏了你的脸，你的反应，一句话' },
                       ].map(a => (
-                        <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
+                        <button key={a.label} className="niwai-btn" onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
+                          style={{ padding: '5px 12px', background: 'var(--btn-bg)', border: '1px solid var(--btn-border)', borderRadius: '20px', color: 'var(--btn-text)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
@@ -1521,51 +1384,145 @@ if (a.special === 'memories') return (
             {expandedAction === 'prank' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
-                border: '1px solid rgba(201,169,110,0.12)',
+                background: 'var(--panel-bg, var(--panel-bg))', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
+                border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
                 {!sameRoom ? (
-                  <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', textAlign: 'center', padding: '8px 0' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-accent, #F88DA7)', textAlign: 'center', padding: '8px 0' }}>
                     他不在这里 ·
                     <span onClick={() => { setExpandedAction(null); handleCallLu() }}
-                      style={{ color: '#c9a96e', cursor: 'pointer', marginLeft: '6px', textDecoration: 'underline' }}
+                      style={{ color: 'var(--text-accent, #c9a96e)', cursor: 'pointer', marginLeft: '6px', textDecoration: 'underline' }}
                     >叫他过来</span>
                   </div>
                 ) : (
                   <>
-                    <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', letterSpacing: '0.15em', marginBottom: '8px' }}>整整他</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                       {[
                         { label: '戳他脸', prompt: '她伸手指戳了戳他的脸，他的反应，一句话' },
                         { label: '偷看他', prompt: '她趁他不注意盯着他看，他发现了，说一句' },
                         { label: '突然亲一下', prompt: '她突然踮脚亲了他的侧脸，他的反应' },
-                        { label: '挡住他的书', prompt: '她把手压在他书上，他的反应，一句话' },
                         { label: '学他讲话', prompt: '她开始模仿他说话的腔调，他发现了，说一句' },
                         { label: '无缘无故推他', prompt: '她没来由推了他一把，他的反应，一句话' },
                         { label: '偷他东西', prompt: '她趁他不注意拿走了他手边的东西，他发现了' },
                         { label: '装作要走', prompt: '她假装要走，看他有没有反应，一句话' },
                         ...customPranks.map(p => ({ label: p.label, prompt: p.prompt }))
                       ].map(a => (
-                        <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
+                        <button key={a.label} className="niwai-btn" onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
+                          style={{ padding: '5px 12px', background: 'var(--btn-bg)', border: '1px solid var(--btn-border)',borderRadius: '20px', color: 'var(--btn-text)',  fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
-                      <button onClick={() => setShowAddPrank(true)}
-                        style={{ padding: '5px 12px', background: 'transparent', border: '1px dashed rgba(201,169,110,0.2)', borderRadius: '20px', color: 'rgba(201,169,110,0.35)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
-                      >+ 自定义</button>
+                        <button onClick={() => setShowAddPrank(true)}
+                          style={{ padding: '5px 12px', background: 'var(--btn-bg)', border: '1px solid var(--btn-border)',borderRadius: '20px',color: 'var(--btn-text)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
+                        >+ 自定义</button>
                     </div>
                   </>
                 )}
               </div>
             )}
 
+            {showRoomPanel && (
+              <div style={{
+                margin: '0 14px 6px',
+                background: 'var(--panel-bg, rgba(27,10,31,0.96))',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
+                borderRadius: '14px',
+                padding: '12px',
+                width: 'auto',            // 确保不超出
+                overflow: 'hidden',       // 防止溢出
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-accent)' }}>{isOutside ? '外出活动' : '房间互动'}</span>
+                  <button onClick={() => setShowRoomPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>✕</button>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {/* 动态生成按钮 — 直接复制之前生成按钮的代码 */}
+                  {(() => {
+                    const actions = [];
+                    if (!isOutside) {
+                      const roomMap = {
+                        living_room: [
+                          { label: '泡茶', prompt: '她去泡了杯茶，你注意到了，说一句' },
+                          { label: '看电视', prompt: '她窝在沙发开始看电视，你在旁边，随口说一句' },
+                          { label: '发呆', prompt: '她在客厅发呆，你看见了，说一句' },
+                          { label: pet ? '🐾 ' + pet.name : '🐾 领养宠物', special: 'pet' },
+                        ],
+                        kitchen: [
+                          { label: '一起做饭', special: 'cook' },
+                          { label: '冰箱', special: 'fridge' },
+                        ],
+                        study: [
+                          { label: '看书', special: 'books' },
+                          { label: '打扰他', prompt: '她故意进书房打扰你，你的反应，一句话' },
+                          { label: '他的日记', special: 'diary' },
+                          { label: '📖 重要回忆', special: 'memories' },
+                        ],
+                        balcony: [
+                          { label: '看星星', prompt: '她在阳台看星星，你跟出来了，说一句' },
+                          { label: '🌱 花园', special: 'garden' },
+                        ],
+                        guest_room: [
+                          { label: '坐会儿', prompt: '她进了客房坐下，你坐在对面，说一句' },
+                        ],
+                        bedroom: [
+                          { label: '躺一躺', prompt: '她走进卧室躺下，你站在门口，说一句' },
+                          { label: '说说话', prompt: '卧室里安静，她想和你说说话，你的反应' },
+                          { label: '衣帽间', special: 'wardrobe' },
+                          { label: '床头柜', special: 'bedside' },
+                        ],
+                      };
+                      const roomActs = roomMap[playerRoom] || [];
+                      actions.push(...roomActs);
+                      if (playerRoom === 'bathroom') {
+                        actions.push({ label: '浴室互动', special: 'bath' });
+                      }
+                      if (playerRoom === 'bedroom' && sameRoom) {
+                        actions.push({ label: '卧室氛围', special: 'bedroom_intimate' });
+                      }
+                    } else {
+                      const outsideMap = {
+                        park:        [{ label: '散步', prompt: '你们在公园散步，你走在她旁边，说一句' }, { label: '坐草地', prompt: '她突然坐到草地上，你站在旁边，说一句' }],
+                        cinema:      [{ label: '挑电影', prompt: '你们站在影院门口选电影，你说一句' }, { label: '买爆米花', prompt: '她去买爆米花，你跟着，说一句' }],
+                        mall:        [{ label: '逛逛', prompt: '她在商场橱窗前停下来，你说一句' }, { label: '🛍️ 逛商场', special: 'shop' }, { label: '帮我提包', prompt: '她把袋子塞给你，你接过来，说一句' }],
+                        supermarket: [{ label: '推车', prompt: '你接过了超市的购物车，说一句' }, { label: '🛒 采购', special: 'supermarket' }, { label: '挑东西', prompt: '她拿起什么东西在研究，你凑过去，说一句' }],
+                        seaside:     [{ label: '吹风', prompt: '海边的风把她头发吹乱了，你看着，说一句' }, { label: '捡贝壳', prompt: '她蹲下来捡贝壳，你站在旁边，说一句' }],
+                        cafe:        [{ label: '点单', prompt: '服务员来了，她在想点什么，你替她说了一句' }, { label: '发呆', prompt: '咖啡馆里很安静，你们都有点发呆，你先开口' }],
+                      };
+                      const outActs = outsideMap[outsidePlace] || [];
+                      actions.push(...outActs);
+                    }
+                    return actions.map((a, idx) => {
+                      if (a.special === 'fridge') return <button key={idx} onClick={() => { setShowFridge(true); }} style={btnStyle()}>冰箱</button>;
+                      if (a.special === 'cook') return <button key={idx} onClick={() => { if (!sameRoom) { setToast('他不在厨房');if (window.confirm('他不在厨房，要叫他过来吗？')) {
+                            handleCallLu(); // 调用现有的叫他过来逻辑
+                            setShowRoomPanel(false);
+                          } return; } setShowFridge('cook'); }} style={btnStyle()}>一起做饭</button>;
+                      if (a.special === 'books') return <button key={idx} onClick={() => {  setShowBooks(true); }} style={btnStyle()}>看书</button>;
+                      if (a.special === 'diary') return <button key={idx} onClick={() => {  setShowDiary(true); }} style={btnStyle()}>他的日记</button>;
+                      if (a.special === 'memories') return <button key={idx} onClick={() => {  setShowMemories(true); }} style={btnStyle()}>📖 重要回忆 {importantMemories.length > 0 && `(${importantMemories.length})`}</button>;
+                      if (a.special === 'wardrobe') return <button key={idx} onClick={() => {  setShowWardrobe(true); }} style={btnStyle()}>衣帽间</button>;
+                      if (a.special === 'bedside') return <button key={idx} onClick={() => {  setShowBedside(true); }} style={btnStyle()}>床头柜</button>;
+                      if (a.special === 'garden') return <button key={idx} onClick={() => {  setShowGarden(true); }} style={btnStyle()}>🌱 花园</button>;
+                      if (a.special === 'pet') return <button key={idx} onClick={() => {  setShowPetPanel(true); }} style={btnStyle()}>{a.label}</button>;
+                      if (a.special === 'shop') return <button key={idx} onClick={() => {  setShowShop(true); }} style={btnStyle()}>🛍️ 逛商场</button>;
+                      if (a.special === 'supermarket') return <button key={idx} onClick={() => {  setShowSupermarket(true); }} style={btnStyle()}>🛒 采购</button>;
+                      if (a.special === 'bath') return <button key={idx} onClick={() => {  setExpandedAction(expandedAction === 'bath' ? null : 'bath'); }} style={btnStyle()}>浴室互动</button>;
+                      if (a.special === 'bedroom_intimate') return <button key={idx} onClick={() => { setExpandedAction(expandedAction === 'bedroom_intimate' ? null : 'bedroom_intimate'); }} style={btnStyle()}>卧室氛围</button>;
+                      return <button key={idx} onClick={() => {sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true); }} style={btnStyle()}>{a.label}</button>;
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+
+
             {/* 展开面板：浴室互动 */}
             {expandedAction === 'bath' && playerRoom === 'bathroom' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
-                border: '1px solid rgba(201,169,110,0.12)',
+                background: 'var(--panel-bg,var(--panel-bg))', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
+                border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
                 {bathPhase === 'idle' && (
@@ -1589,7 +1546,7 @@ if (a.special === 'memories') return (
                         { label: '帮我吹头发', prompt: '她洗完出来让他帮她吹头发，他的反应' },
                       ]).map(a => (
                         <button key={a.label} onClick={() => { setExpandedAction(null); sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true) }}
-                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
+                          style={{ padding: '5px 12px', background: 'var(--border-glass)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'var(--text-secondary, rgba(201,169,110,0.7))', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
@@ -1609,7 +1566,7 @@ if (a.special === 'memories') return (
                   </>
                 )}
                 {bathPhase === 'asking' && (
-                  <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', textAlign: 'center', padding: '8px 0' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-accent, #F88DA7)', textAlign: 'center', padding: '8px 0' }}>
                     等他回应…
                     <button onClick={() => setBathPhase('idle')} style={{ marginLeft: '10px', background: 'none', border: 'none', color: 'rgba(201,169,110,0.3)', cursor: 'pointer', fontSize: '11px' }}>取消</button>
                   </div>
@@ -1630,7 +1587,7 @@ if (a.special === 'memories') return (
                         { label: '靠着他', prompt: '你们一起在浴室，她往他身上靠了一下，他的反应' },
                       ].map(a => (
                         <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
-                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
+                          style={{ padding: '5px 12px', background: 'var(--border-glass)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'var(--text-secondary, rgba(201,169,110,0.7))', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
@@ -1652,9 +1609,9 @@ if (a.special === 'memories') return (
                               <button key={p.id} onClick={() => !locked && setSelPos(p.id)} style={{
                                 border: 'none', borderRadius: '8px', padding: '6px 8px', fontSize: '11px',
                                 cursor: locked ? 'default' : 'pointer', fontFamily: 'Georgia, serif', textAlign: 'left',
-                                background: active ? 'rgba(201,169,110,0.18)' : 'rgba(255,255,255,0.03)',
+                                background: active ? 'var(--card-bg-hover)' : 'var(--card-bg)',
                                 outline: active ? '1px solid rgba(201,169,110,0.4)' : '1px solid rgba(255,255,255,0.06)',
-                                color: locked ? 'rgba(255,255,255,0.15)' : active ? '#c9a96e' : 'rgba(255,255,255,0.5)',
+                                color: locked ? 'rgba(255,255,255,0.15)' : active ? 'var(--text-accent, #c9a96e)' : 'rgba(255,255,255,0.5)',
                               }}>
                                 {locked ? `🔒 ${p.name}` : p.name}
                                 <div style={{ fontSize: '9px', color: locked ? 'rgba(255,255,255,0.1)' : 'rgba(201,169,110,0.3)', marginTop: '1px' }}>
@@ -1665,7 +1622,7 @@ if (a.special === 'memories') return (
                           })}
                         </div>
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          <button onClick={() => startIntimGame(true)} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.12)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '20px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>❤️ 开始</button>
+                          <button onClick={() => startIntimGame(true)} style={{ padding: '6px 14px', background: 'var(--border-glass)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '20px', color: 'var(--text-accent, #c9a96e)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>❤️ 开始</button>
                           <button onClick={resetIntim} style={{ padding: '6px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer' }}>算了</button>
                         </div>
                       </div>
@@ -1681,13 +1638,13 @@ if (a.special === 'memories') return (
                           </div>
                           <div style={{ marginBottom: '5px' }}>
                             <div style={{ display:'flex', justifyContent:'space-between', fontSize:'9px', color:'rgba(255,255,255,0.25)', marginBottom:'2px' }}><span>她 💧</span><span>{Math.round(mProg)}</span></div>
-                            <div style={{ height:'4px', background:'rgba(255,255,255,0.06)', borderRadius:'4px', overflow:'hidden' }}>
+                            <div style={{ height:'4px', background:'var(--room-btn-bg)', borderRadius:'4px', overflow:'hidden' }}>
                               <div style={{ height:'100%', width:`${mProg}%`, background:'linear-gradient(90deg,#f8a0c0,#e04080)', borderRadius:'4px', transition:'width .4s' }} />
                             </div>
                           </div>
                           <div style={{ marginBottom: '8px' }}>
                             <div style={{ display:'flex', justifyContent:'space-between', fontSize:'9px', color:'rgba(255,255,255,0.25)', marginBottom:'2px' }}><span>他 🔥</span><span>{Math.round(cProg)}</span></div>
-                            <div style={{ height:'4px', background:'rgba(255,255,255,0.06)', borderRadius:'4px', overflow:'hidden' }}>
+                            <div style={{ height:'4px', background:'var(--room-btn-bg)', borderRadius:'4px', overflow:'hidden' }}>
                               <div style={{ height:'100%', width:`${cProg}%`, background:'linear-gradient(90deg,#c9a96e,#e08030)', borderRadius:'4px', transition:'width .4s' }} />
                             </div>
                           </div>
@@ -1697,7 +1654,7 @@ if (a.special === 'memories') return (
                             {PLAYER_ACTIONS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
                           </select>
                           <button onClick={doPlayerAction} disabled={isAiTurn}
-                            style={{ width:'100%', padding:'7px', background:isAiTurn?'rgba(201,169,110,0.05)':'rgba(201,169,110,0.12)', border:'1px solid rgba(201,169,110,0.25)', borderRadius:'10px', color:isAiTurn?'rgba(201,169,110,0.25)':'#c9a96e', fontSize:'12px', cursor:isAiTurn?'default':'pointer', fontFamily:'Georgia,serif' }}>
+                            style={{ width:'100%', padding:'7px', background:isAiTurn?'rgba(201,169,110,0.05)':'var(--border-glass)', border:'1px solid rgba(201,169,110,0.25)', borderRadius:'10px', color:isAiTurn?'rgba(201,169,110,0.25)':'var(--text-accent, #c9a96e)', fontSize:'12px', cursor:isAiTurn?'default':'pointer', fontFamily:'Georgia,serif' }}>
                             {isAiTurn ? '等他…' : '↩ 执行'}
                           </button>
                         </div>
@@ -1714,8 +1671,8 @@ if (a.special === 'memories') return (
             {expandedAction === 'bedroom_intimate' && playerRoom === 'bedroom' && (
               <div style={{
                 margin: '0 14px 6px',
-                background: 'rgba(12,9,6,0.95)', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
-                border: '1px solid rgba(201,169,110,0.12)',
+                background: 'var(--panel-bg, var(--panel-bg))', backdropFilter: 'blur(12px)', isolation: 'isolate', WebkitBackdropFilter: 'blur(12px)',isolation: 'isolate',
+                border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
                 borderRadius: '14px', padding: '10px 12px',
               }}>
                 {/* 浪漫值进度条 */}
@@ -1727,7 +1684,7 @@ if (a.special === 'memories') return (
                       {totalWk > 0 && <span style={{ marginLeft: '8px', color: 'rgba(201,169,110,0.2)', fontSize: '9px' }}>亲密×{totalWk}</span>}
                     </span>
                   </div>
-                  <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '4px', background: 'var(--room-btn-bg)', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${Math.min(100, romantic)}%`, background: 'linear-gradient(to right, rgba(201,169,110,0.4), rgba(201,169,110,0.8))', borderRadius: '4px', transition: 'width 0.4s' }} />
                   </div>
                 </div>
@@ -1755,7 +1712,7 @@ if (a.special === 'memories') return (
                         { label: '摸他头发', action: () => { setRomantic(n => Math.min(100, n + 10)); sendToAI('她轻轻摸了摸他的头发，他的反应，一句话', messages, intimacy, playerRoom, luRoom, false, undefined, true) } },
                       ].map(a => (
                         <button key={a.label} onClick={() => a.action()}
-                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
+                          style={{ padding: '5px 12px', background: 'var(--border-glass)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'var(--text-secondary, rgba(201,169,110,0.7))', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
@@ -1764,7 +1721,7 @@ if (a.special === 'memories') return (
                         setIntimatePhase('agreed')
                         const avail = getAvailPos(false)
                         setSelPos(avail[0]?.id || 'face')
-                      }} style={{ padding: '6px 16px', background: 'rgba(201,169,110,0.15)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '20px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>再近一点</button>
+                      }} style={{ padding: '6px 16px', background: 'rgba(201,169,110,0.15)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '20px', color: 'var(--text-accent, #c9a96e)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>再近一点</button>
                     ) : (
                       <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.25)', marginTop: '4px' }}>
                         {!sameRoom ? '他不在这里' : romantic < 60 ? `浪漫值 ${romantic}/60` : `好感度需要60以上`}
@@ -1773,7 +1730,7 @@ if (a.special === 'memories') return (
                   </>
                 )}
                 {intimatePhase === 'asking' && (
-                  <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', textAlign: 'center', padding: '8px 0' }}>等他回应…
+                  <div style={{ fontSize: '12px', color: 'var(--text-accent, #F88DA7)', textAlign: 'center', padding: '8px 0' }}>等他回应…
                     <button onClick={() => setIntimatePhase('idle')} style={{ marginLeft: '10px', background: 'none', border: 'none', color: 'rgba(201,169,110,0.3)', cursor: 'pointer', fontSize: '11px' }}>取消</button>
                   </div>
                 )}
@@ -1785,7 +1742,7 @@ if (a.special === 'memories') return (
                 )}
                 {intimatePhase === 'agreed' && (
                   <div>
-                    <div style={{ fontSize: '10px', color: '#c9a96e', marginBottom: '8px' }}>选个姿势</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-accent, #c9a96e)', marginBottom: '8px' }}>选个姿势</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '5px', marginBottom: '8px' }}>
                       {BEDROOM_POSITIONS.map(p => {
                         const locked = p.unlockWk > totalWk
@@ -1794,9 +1751,9 @@ if (a.special === 'memories') return (
                           <button key={p.id} onClick={() => !locked && setSelPos(p.id)} style={{
                             border: 'none', borderRadius: '8px', padding: '7px 8px', fontSize: '11px',
                             cursor: locked ? 'default' : 'pointer', fontFamily: 'Georgia, serif', textAlign: 'left',
-                            background: active ? 'rgba(201,169,110,0.18)' : 'rgba(255,255,255,0.03)',
+                            background: active ? 'var(--card-bg-hover)' : 'var(--card-bg)',
                             outline: active ? '1px solid rgba(201,169,110,0.4)' : '1px solid rgba(255,255,255,0.06)',
-                            color: locked ? 'rgba(255,255,255,0.15)' : active ? '#c9a96e' : 'rgba(255,255,255,0.5)',
+                            color: locked ? 'rgba(255,255,255,0.15)' : active ? 'var(--text-accent, #c9a96e)' : 'rgba(255,255,255,0.5)',
                           }}>
                             {locked ? `🔒 ${p.name}` : p.name}
                             <div style={{ fontSize: '9px', color: locked ? 'rgba(255,255,255,0.1)' : 'rgba(201,169,110,0.3)', marginTop: '1px' }}>
@@ -1807,7 +1764,7 @@ if (a.special === 'memories') return (
                       })}
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => startIntimGame(false)} style={{ flex: 1, padding: '8px', background: 'rgba(201,169,110,0.12)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '10px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>❤️ 开始</button>
+                      <button onClick={() => startIntimGame(false)} style={{ flex: 1, padding: '8px', background: 'var(--border-glass)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: '10px', color: 'var(--text-accent, #c9a96e)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>❤️ 开始</button>
                       <button onClick={resetIntim} style={{ padding: '8px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', color: 'rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer' }}>算了</button>
                     </div>
                   </div>
@@ -1818,18 +1775,18 @@ if (a.special === 'memories') return (
                   const pos = avail.find(p => p.id === selPos) || avail[0]
                   return (
                     <div>
-                      <div style={{ fontSize: '11px', color: '#c9a96e', marginBottom: '7px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-accent, #c9a96e)', marginBottom: '7px' }}>
                         {pos?.name} · {'●'.repeat(rhythm)}{'○'.repeat(5-rhythm)}
                       </div>
                       <div style={{ marginBottom: '5px' }}>
                         <div style={{ display:'flex', justifyContent:'space-between', fontSize:'10px', color:'rgba(255,255,255,0.25)', marginBottom:'3px' }}><span>她 💧</span><span>{Math.round(mProg)}</span></div>
-                        <div style={{ height:'5px', background:'rgba(255,255,255,0.06)', borderRadius:'4px', overflow:'hidden' }}>
+                        <div style={{ height:'5px', background:'var(--room-btn-bg)', borderRadius:'4px', overflow:'hidden' }}>
                           <div style={{ height:'100%', width:`${mProg}%`, background:'linear-gradient(90deg,#f8a0c0,#e04080)', borderRadius:'4px', transition:'width .4s' }} />
                         </div>
                       </div>
                       <div style={{ marginBottom: '8px' }}>
                         <div style={{ display:'flex', justifyContent:'space-between', fontSize:'10px', color:'rgba(255,255,255,0.25)', marginBottom:'3px' }}><span>他 🔥</span><span>{Math.round(cProg)}</span></div>
-                        <div style={{ height:'5px', background:'rgba(255,255,255,0.06)', borderRadius:'4px', overflow:'hidden' }}>
+                        <div style={{ height:'5px', background:'var(--room-btn-bg)', borderRadius:'4px', overflow:'hidden' }}>
                           <div style={{ height:'100%', width:`${cProg}%`, background:'linear-gradient(90deg,#c9a96e,#e08030)', borderRadius:'4px', transition:'width .4s' }} />
                         </div>
                       </div>
@@ -1839,7 +1796,7 @@ if (a.special === 'memories') return (
                         {PLAYER_ACTIONS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
                       </select>
                       <button onClick={doPlayerAction} disabled={isAiTurn}
-                        style={{ width:'100%', padding:'8px', background:isAiTurn?'rgba(201,169,110,0.05)':'rgba(201,169,110,0.12)', border:'1px solid rgba(201,169,110,0.25)', borderRadius:'10px', color:isAiTurn?'rgba(201,169,110,0.25)':'#c9a96e', fontSize:'12px', cursor:isAiTurn?'default':'pointer', fontFamily:'Georgia,serif' }}>
+                        style={{ width:'100%', padding:'8px', background:isAiTurn?'rgba(201,169,110,0.05)':'var(--border-glass)', border:'1px solid rgba(201,169,110,0.25)', borderRadius:'10px', color:isAiTurn?'rgba(201,169,110,0.25)':'var(--text-accent, #c9a96e)', fontSize:'12px', cursor:isAiTurn?'default':'pointer', fontFamily:'Georgia,serif' }}>
                         {isAiTurn ? '等他…' : '↩ 执行'}
                       </button>
                     </div>
@@ -1863,7 +1820,7 @@ if (a.special === 'memories') return (
                         { label: '说晚安', prompt: '她说晚安，他的回应，余温里的一句话，低沉温柔' },
                       ]).map(a => (
                         <button key={a.label} onClick={() => sendToAI(a.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)}
-                          style={{ padding: '5px 12px', background: 'rgba(201,169,110,0.06)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px', color: 'rgba(201,169,110,0.6)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
+                          style={{ padding: '5px 12px', background: 'var(--border-glass)', border: '1px solid var(--border-glass, rgba(201,169,110,0.12))', borderRadius: '20px', color: 'rgba(201,169,110,0.6)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif' }}
                         >{a.label}</button>
                       ))}
                     </div>
@@ -1890,10 +1847,8 @@ if (a.special === 'memories') return (
 
             {/* 输入框行 */}
             <div style={{
-              padding: '6px 14px 18px',
-              paddingLeft: sameRoom && !isOutside ? '82px' : '14px',
+              padding: '2px 14px 12px',
               display: 'flex', gap: '10px', alignItems: 'center',
-              transition: 'padding-left 0.3s',
             }}>
               <input
                 value={input}
@@ -1901,16 +1856,19 @@ if (a.special === 'memories') return (
                 onKeyDown={e => e.key === 'Enter' && handleSend()}
                 placeholder='说点什么…'
                 style={{
-                  flex: 1, background: 'rgba(12,9,6,0.75)',
-                  border: '1px solid rgba(201,169,110,0.12)',
-                  borderRadius: '22px', padding: '11px 18px', color: '#e8dcc8',
+                  flex: 1,
+                  //background: 'var(--input-bg)',
+                  background: 'var(--message-bg-assistant)',   // 改成和消息气泡一致
+                  //border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
+                  border: '1px solid var(--btn-border)',
+                  borderRadius: '22px', padding: '11px 18px', color: 'var(--message-text-assistant)',
                   fontSize: '14px', outline: 'none', fontFamily: 'Georgia, serif',
                   backdropFilter: 'blur(8px)',isolation: 'isolate'
                 }}
               />
               <button onClick={handleSend} disabled={loading} style={{
                 width: '44px', height: '44px', borderRadius: '50%',
-                background: loading ? 'rgba(201,169,110,0.12)' : '#c9a96e',
+                background: loading ? 'var(--border-glass)' : 'var(--text-accent, #c9a96e)',
                 border: 'none', color: '#0f0c09', fontSize: '18px',
                 cursor: loading ? 'default' : 'pointer', flexShrink: 0,
                 transition: 'background 0.2s',
@@ -1929,15 +1887,15 @@ if (a.special === 'memories') return (
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <div onClick={e => e.stopPropagation()} style={{
-            background: 'rgba(10,7,4,0.97)',
-            border: '1px solid rgba(201,169,110,0.12)',
+            background: 'var(--panel-bg, rgba(10,7,4,0.97))',
+            border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
             borderRadius: '16px', padding: '28px 24px',
             width: '260px', textAlign: 'center',
           }}>
-            <div style={{ fontSize: '13px', color: 'rgba(201,169,110,0.5)', letterSpacing: '0.15em', marginBottom: '8px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-accent, #F88DA7)', letterSpacing: '0.15em', marginBottom: '8px' }}>
               客房
             </div>
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginBottom: '24px', lineHeight: 1.6 }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary, rgba(255,255,255,0.3))', marginBottom: '24px', lineHeight: 1.6 }}>
               他在里面。
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -1962,7 +1920,7 @@ if (a.special === 'memories') return (
               }} style={{
                 flex: 1, background: 'rgba(201,169,110,0.08)',
                 border: '1px solid rgba(201,169,110,0.25)',
-                color: '#c9a96e', padding: '10px',
+                color: 'var(--text-accent, #c9a96e)', padding: '10px',
                 borderRadius: '8px', cursor: 'pointer', fontSize: '12px',
                 fontFamily: 'Georgia, serif', letterSpacing: '0.05em',
               }}>敲门</button>
@@ -1980,8 +1938,8 @@ if (a.special === 'memories') return (
         }}>
           <div onClick={e => e.stopPropagation()} style={{
             width: '100%', maxWidth: '480px',
-            background: 'rgba(10,7,4,0.97)',
-            border: '1px solid rgba(201,169,110,0.1)',
+            background: 'var(--panel-bg, rgba(10,7,4,0.97))',
+            border: '1px solid var(--border-glass, rgba(201,169,110,0.1))',
             borderRadius: '20px 20px 0 0',
             padding: '20px 20px 36px',
           }}>
@@ -1992,9 +1950,9 @@ if (a.special === 'memories') return (
               {OUTSIDE_PLACES.map(place => (
                 <button key={place.id} onClick={() => handleGoOutside(place.id)} style={{
                   background: 'rgba(201,169,110,0.05)',
-                  border: '1px solid rgba(201,169,110,0.1)',
+                  border: '1px solid var(--border-glass, rgba(201,169,110,0.1))',
                   borderRadius: '12px', padding: '14px 8px',
-                  cursor: 'pointer', color: '#e8dcc8',
+                  cursor: 'pointer', color: 'var(--text-primary, #e8dcc8)',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px',
                 }}>
                   <span style={{ fontSize: '15px' }}>{place.name}</span>
@@ -2010,15 +1968,15 @@ if (a.special === 'memories') return (
       {showAddPrank && (
         <div onClick={() => setShowAddPrank(false)} style={{
           position: 'fixed', inset: 0, zIndex: 250,
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',isolation: 'isolate',
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',isolation: 'isolate',
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
         }}>
           <div onClick={e => e.stopPropagation()} style={{
             width: '100%', maxWidth: '480px',
-            background: 'rgba(10,7,4,0.97)', border: '1px solid rgba(201,169,110,0.12)',
+            background: 'var(--panel-bg, rgba(10,7,4,0.97))', border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
             borderRadius: '20px 20px 0 0', padding: '20px 20px 40px',
           }}>
-            <div style={{ fontSize: '12px', color: 'rgba(201,169,110,0.5)', letterSpacing: '0.15em', marginBottom: '14px' }}>自定义恶作剧</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-accent, #F88DA7)', letterSpacing: '0.15em', marginBottom: '14px' }}>自定义恶作剧</div>
             <input
               value={newPrankText}
               onChange={e => setNewPrankText(e.target.value)}
@@ -2026,7 +1984,7 @@ if (a.special === 'memories') return (
               style={{
                 width: '100%', padding: '11px 14px', marginBottom: '12px',
                 background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,169,110,0.15)',
-                borderRadius: '12px', color: '#e8dcc8', fontSize: '13px',
+                borderRadius: '12px', color: 'var(--text-primary, #e8dcc8)', fontSize: '13px',
                 outline: 'none', fontFamily: 'Georgia, serif',
               }}
             />
@@ -2045,8 +2003,8 @@ if (a.special === 'memories') return (
                 setShowAddPrank(false)
               }} style={{
                 flex: 2, padding: '12px',
-                background: 'rgba(201,169,110,0.12)', border: '1px solid rgba(201,169,110,0.25)',
-                borderRadius: '12px', color: '#c9a96e', fontSize: '13px',
+                background: 'var(--border-glass)', border: '1px solid rgba(201,169,110,0.25)',
+                borderRadius: '12px', color: 'var(--text-accent, #c9a96e)', fontSize: '13px',
                 cursor: 'pointer', fontFamily: 'Georgia, serif', letterSpacing: '0.08em',
               }}>加进去</button>
             </div>
@@ -2066,15 +2024,15 @@ if (a.special === 'memories') return (
         const isCook = showFridge === 'cook'
         const canMake = (recipe) => Object.entries(recipe.need).every(([k, v]) => (fridge[k] || 0) >= v)
         return (
-          <div onClick={() => setShowFridge(false)} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', isolation: 'isolate',display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'rgba(10,7,4,0.97)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '70vh', overflowY: 'auto' }}>
+          <div onClick={() => setShowFridge(false)} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', isolation: 'isolate',display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'var(--panel-bg, rgba(10,7,4,0.97))', border: '1px solid var(--border-glass, rgba(201,169,110,0.12))', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '70vh', overflowY: 'auto' }}>
               <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', letterSpacing: '0.2em', marginBottom: '14px' }}>{isCook ? '一起做饭 · 选菜谱' : '冰箱 · 食材'}</div>
               {!isCook ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '8px' }}>
                   {Object.entries(fridge).map(([name, qty]) => (
-                    <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: qty > 0 ? 'rgba(201,169,110,0.06)' : 'rgba(255,255,255,0.02)', border: '1px solid rgba(201,169,110,0.1)', borderRadius: '10px' }}>
+                    <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: qty > 0 ? 'var(--border-glass)' : 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass, rgba(201,169,110,0.1))', borderRadius: '10px' }}>
                       <span style={{ fontSize: '13px', color: qty > 0 ? '#e8dcc8' : 'rgba(255,255,255,0.2)' }}>{name}</span>
-                      <span style={{ fontSize: '13px', color: qty > 0 ? 'rgba(201,169,110,0.7)' : 'rgba(255,255,255,0.15)' }}>×{qty}</span>
+                      <span style={{ fontSize: '13px', color: qty > 0 ? 'var(--text-secondary, rgba(201,169,110,0.7))' : 'rgba(255,255,255,0.15)' }}>×{qty}</span>
                     </div>
                   ))}
                 </div>
@@ -2091,7 +2049,7 @@ if (a.special === 'memories') return (
                         })
                         setShowFridge(false)
                         sendToAI(r.prompt, messages, intimacy, playerRoom, luRoom, false, undefined, true)
-                      }} style={{ padding: '12px 14px', background: ok ? 'rgba(201,169,110,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${ok ? 'rgba(201,169,110,0.25)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '12px', cursor: ok ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'Georgia,serif' }}>
+                      }} style={{ padding: '12px 14px', background: ok ? 'rgba(201,169,110,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${ok ? 'rgba(201,169,110,0.25)' : 'var(--room-btn-bg)'}`, borderRadius: '12px', cursor: ok ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'Georgia,serif' }}>
                         <div style={{ fontSize: '14px', color: ok ? '#e8dcc8' : 'rgba(255,255,255,0.2)', marginBottom: '4px' }}>{r.name}</div>
                         <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>
                           {Object.entries(r.need).map(([k, v]) => `${k}×${v}`).join('  ')}
@@ -2109,22 +2067,22 @@ if (a.special === 'memories') return (
 
       {/* ══ 看书弹窗 ══ */}
       {showBooks && (
-        <div onClick={() => { setShowBooks(false); setShowAddBook(false) }} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', isolation: 'isolate',display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'rgba(10,7,4,0.97)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto' }}>
+        <div onClick={() => { setShowBooks(false); setShowAddBook(false) }} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', isolation: 'isolate',display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'var(--panel-bg, rgba(10,7,4,0.97))', border: '1px solid var(--border-glass, rgba(201,169,110,0.12))', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', letterSpacing: '0.2em' }}>书架</div>
-              <button onClick={() => setShowAddBook(!showAddBook)} style={{ fontSize: '11px', background: 'none', border: '1px solid rgba(201,169,110,0.2)', color: 'rgba(201,169,110,0.5)', padding: '4px 12px', borderRadius: '20px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>+ 添加</button>
+              <button onClick={() => setShowAddBook(!showAddBook)} style={{ fontSize: '11px', background: 'none', border: '1px solid rgba(201,169,110,0.2)', color: 'var(--text-accent, #F88DA7)', padding: '4px 12px', borderRadius: '20px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>+ 添加</button>
             </div>
             {showAddBook && (
               <div style={{ marginBottom: '12px', display: 'flex', gap: '8px' }}>
-                <input value={newBookTitle} onChange={e => setNewBookTitle(e.target.value)} placeholder='书名（作者可选）' style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '10px', padding: '8px 12px', color: '#e8dcc8', fontSize: '12px', outline: 'none', fontFamily: 'Georgia,serif' }} />
+                <input value={newBookTitle} onChange={e => setNewBookTitle(e.target.value)} placeholder='书名（作者可选）' style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '10px', padding: '8px 12px', color: 'var(--text-primary, #e8dcc8)', fontSize: '12px', outline: 'none', fontFamily: 'Georgia,serif' }} />
                 <button onClick={() => {
                   if (!newBookTitle.trim()) return
                   const parts = newBookTitle.split(' ')
                   setBookList(prev => [...prev, { title: parts[0], author: parts[1] || '' }])
                   setNewBookTitle('')
                   setShowAddBook(false)
-                }} style={{ padding: '8px 14px', background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)', borderRadius: '10px', color: '#c9a96e', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>加入</button>
+                }} style={{ padding: '8px 14px', background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)', borderRadius: '10px', color: 'var(--text-accent, #c9a96e)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>加入</button>
               </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -2132,8 +2090,8 @@ if (a.special === 'memories') return (
                 <button key={i} onClick={() => {
                   setShowBooks(false)
                   sendToAI(`她拿起《${b.title}》看了起来${b.author ? `（${b.author}写的）` : ''}，你注意到了，发表一句评价或问她看到哪里了`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
-                }} style={{ padding: '10px 14px', background: 'rgba(201,169,110,0.05)', border: '1px solid rgba(201,169,110,0.1)', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Georgia,serif' }}>
-                  <span style={{ fontSize: '14px', color: '#e8dcc8' }}>《{b.title}》</span>
+                }} style={{ padding: '10px 14px', background: 'rgba(201,169,110,0.05)', border: '1px solid var(--border-glass, rgba(201,169,110,0.1))', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Georgia,serif' }}>
+                  <span style={{ fontSize: '14px', color: 'var(--text-primary, #e8dcc8)' }}>《{b.title}》</span>
                   {b.author && <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', marginLeft: '8px' }}>{b.author}</span>}
                 </button>
               ))}
@@ -2144,13 +2102,13 @@ if (a.special === 'memories') return (
 
       {/* ══ 日记弹窗 ══ */}
       {showDiary && (
-        <div onClick={() => { setShowDiary(false); setViewingDiary(null) }} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',isolation: 'isolate', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'rgba(10,7,4,0.97)', border: '1px solid rgba(201,169,110,0.12)', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto' }}>
+        <div onClick={() => { setShowDiary(false); setViewingDiary(null) }} style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',isolation: 'isolate', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'var(--panel-bg, rgba(10,7,4,0.97))', border: '1px solid var(--border-glass, rgba(201,169,110,0.12))', borderRadius: '20px 20px 0 0', padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto' }}>
             {viewingDiary !== null ? (
               <>
                 <button onClick={() => setViewingDiary(null)} style={{ fontSize: '11px', background: 'none', border: 'none', color: 'rgba(201,169,110,0.4)', cursor: 'pointer', marginBottom: '12px', fontFamily: 'Georgia,serif' }}>← 返回</button>
                 <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.3)', marginBottom: '10px' }}>{diaryList[viewingDiary]?.date}</div>
-                <div style={{ fontSize: '14px', color: '#e8dcc8', lineHeight: 1.9, fontStyle: 'italic' }}>{diaryList[viewingDiary]?.content}</div>
+                <div style={{ fontSize: '14px', color: 'var(--text-primary, #e8dcc8)', lineHeight: 1.9, fontStyle: 'italic' }}>{diaryList[viewingDiary]?.content}</div>
               </>
             ) : (
               <>
@@ -2162,7 +2120,7 @@ if (a.special === 'memories') return (
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {diaryList.map((d, i) => (
-                      <button key={i} onClick={() => setViewingDiary(i)} style={{ padding: '10px 14px', background: 'rgba(201,169,110,0.05)', border: '1px solid rgba(201,169,110,0.1)', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Georgia,serif' }}>
+                      <button key={i} onClick={() => setViewingDiary(i)} style={{ padding: '10px 14px', background: 'rgba(201,169,110,0.05)', border: '1px solid var(--border-glass, rgba(201,169,110,0.1))', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Georgia,serif' }}>
                         <span style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', marginRight: '10px' }}>{d.date}</span>
                         <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.45)', fontStyle: 'italic' }}>{d.content.slice(0, 20)}…</span>
                       </button>
@@ -2179,23 +2137,23 @@ if (a.special === 'memories') return (
 {showMemories && (
   <div onClick={() => setShowMemories(false)} style={{
     position: 'fixed', inset: 0, zIndex: 250,
-    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
     display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
   }}>
     <div onClick={e => e.stopPropagation()} style={{
       width: '100%', maxWidth: '480px',
-      background: 'rgba(10,7,4,0.97)',
-      border: '1px solid rgba(201,169,110,0.12)',
+      background: 'var(--panel-bg, rgba(10,7,4,0.97))',
+      border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
       borderRadius: '20px 20px 0 0',
       padding: '20px 20px 44px',
       maxHeight: '75vh',
       overflowY: 'auto',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>📖 重要回忆</div>
+        <div style={{ fontSize: '13px', color: 'var(--text-accent, #c9a96e)', letterSpacing: '0.1em' }}>📖 重要回忆</div>
         <button onClick={() => setShowMemories(false)} style={{
           background: 'none', border: 'none',
-          color: 'rgba(255,255,255,0.3)', fontSize: '18px', cursor: 'pointer'
+          color: 'var(--text-secondary, rgba(255,255,255,0.3))', fontSize: '18px', cursor: 'pointer'
         }}>✕</button>
       </div>
 
@@ -2212,8 +2170,8 @@ if (a.special === 'memories') return (
           {importantMemories.map((memory, idx) => (
             <div key={idx} style={{
               padding: '14px',
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(201,169,110,0.1)',
+              background: 'var(--card-bg)',
+              border: '1px solid var(--border-glass, rgba(201,169,110,0.1))',
               borderRadius: '12px',
             }}>
               <div style={{
@@ -2224,7 +2182,7 @@ if (a.special === 'memories') return (
               }}>
                 <div style={{
                   fontSize: '14px',
-                  color: '#c9a96e',
+                  color: 'var(--text-accent, #c9a96e)',
                   fontWeight: 'bold',
                   letterSpacing: '0.05em'
                 }}>
@@ -2256,17 +2214,17 @@ if (a.special === 'memories') return (
     const gd = realDate()
     const calData = getCalendarData(calYear, calMonth, periodDays, gd)
     const predicted = predictNextPeriod(periodDays)
-    const calNavBtn = { background: 'none', border: '1px solid rgba(201,169,110,0.15)', color: 'rgba(201,169,110,0.5)', padding: '4px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'Georgia, serif' }
+    const calNavBtn = { background: 'none', border: '1px solid rgba(201,169,110,0.15)', color: 'var(--text-accent, #F88DA7)', padding: '4px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'Georgia, serif' }
     return (
       <div onClick={() => setShowCalendar(false)} style={{
         position: 'fixed', inset: 0, zIndex: 250,
-        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}>
         <div onClick={e => e.stopPropagation()} style={{
           width: '100%', maxWidth: '480px',
-          background: 'rgba(10,7,4,0.97)',
-          border: '1px solid rgba(201,169,110,0.12)',
+          background: 'var(--panel-bg, rgba(10,7,4,0.97))',
+          border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
           borderRadius: '20px 20px 0 0',
           padding: '20px 20px 44px',
         }}>
@@ -2279,7 +2237,7 @@ if (a.special === 'memories') return (
               if (calMonth === 1) { setCalMonth(12); setCalYear(calYear - 1) }
               else setCalMonth(calMonth - 1)
             }} style={calNavBtn}>◀</button>
-            <span style={{ fontSize: '13px', color: '#c9a96e' }}>{calYear}年{calMonth}月</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-accent, #c9a96e)' }}>{calYear}年{calMonth}月</span>
             <button onClick={() => {
               if (calMonth === 12) { setCalMonth(1); setCalYear(calYear + 1) }
               else setCalMonth(calMonth + 1)
@@ -2328,19 +2286,19 @@ if (a.special === 'memories') return (
 {showWardrobe && (
   <div onClick={() => setShowWardrobe(false)} style={{
     position: 'fixed', inset: 0, zIndex: 250,
-    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
     display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
   }}>
     <div onClick={e => e.stopPropagation()} style={{
       width: '100%', maxWidth: '480px',
-      background: 'rgba(10,7,4,0.97)',
-      border: '1px solid rgba(201,169,110,0.12)',
+      background: 'var(--panel-bg, rgba(10,7,4,0.97))',
+      border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
       borderRadius: '20px 20px 0 0',
       padding: '20px 20px 44px', maxHeight: '70vh', overflowY: 'auto',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-        <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>衣帽间</div>
-        <button onClick={() => setShowWardrobe(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+        <div style={{ fontSize: '13px', color: 'var(--text-accent, #c9a96e)', letterSpacing: '0.1em' }}>衣帽间</div>
+        <button onClick={() => setShowWardrobe(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary, rgba(255,255,255,0.3))', fontSize: '18px', cursor: 'pointer' }}>✕</button>
       </div>
 
       <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.35)', marginBottom: '14px' }}>
@@ -2356,10 +2314,10 @@ if (a.special === 'memories') return (
             saveToDb(messages, intimacy, playerRoom, luRoom)
           }} style={{
             padding: '12px 14px', textAlign: 'left',
-            background: currentOutfit === o.id ? 'rgba(201,169,110,0.1)' : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${currentOutfit === o.id ? 'rgba(201,169,110,0.3)' : 'rgba(255,255,255,0.06)'}`,
+            background: currentOutfit === o.id ? 'rgba(201,169,110,0.1)' : 'var(--card-bg)',
+            border: `1px solid ${currentOutfit === o.id ? 'rgba(201,169,110,0.3)' : 'var(--room-btn-bg)'}`,
             borderRadius: '12px', cursor: 'pointer',
-            color: currentOutfit === o.id ? '#c9a96e' : 'rgba(255,255,255,0.5)',
+            color: currentOutfit === o.id ? 'var(--text-accent, #c9a96e)' : 'rgba(255,255,255,0.5)',
             fontFamily: 'Georgia, serif',
           }}>
             <div style={{ fontSize: '13px', marginBottom: '3px' }}>{o.name}</div>
@@ -2370,7 +2328,7 @@ if (a.special === 'memories') return (
     </div>
   </div>
 )}
-{/* 床头柜弹窗 */}
+{/* 床头柜弹窗（新版，支持数量） */}
 {showBedside && (
   <div onClick={() => setShowBedside(false)} style={{
     position: 'fixed', inset: 0, zIndex: 250,
@@ -2379,14 +2337,14 @@ if (a.special === 'memories') return (
   }}>
     <div onClick={e => e.stopPropagation()} style={{
       width: '100%', maxWidth: '480px',
-      background: 'rgba(10,7,4,0.97)',
-      border: '1px solid rgba(201,169,110,0.12)',
+      background: 'var(--panel-bg, rgba(10,7,4,0.97))',
+      border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
       borderRadius: '20px 20px 0 0',
       padding: '20px 20px 44px', maxHeight: '70vh', overflowY: 'auto',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-        <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>床头柜</div>
-        <button onClick={() => setShowBedside(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+        <div style={{ fontSize: '13px', color: 'var(--text-accent, #c9a96e)', letterSpacing: '0.1em' }}>床头柜</div>
+        <button onClick={() => setShowBedside(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary, rgba(255,255,255,0.3))', fontSize: '18px', cursor: 'pointer' }}>✕</button>
       </div>
 
       {bedsideItems.length === 0 ? (
@@ -2399,23 +2357,33 @@ if (a.special === 'memories') return (
             {intimatePhase !== 'idle' ? '选一件使用' : '氛围道具可随时使用，情趣道具在亲密时使用'}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {getOwnedBedsideItems(bedsideItems).map(item => {
-              const isIntimate = item.category === 'intimate'
+            {bedsideItems.map(item => {
+              // 从 ALL_BEDSIDE_ITEMS 中找到完整信息
+              const fullItem = ALL_BEDSIDE_ITEMS.find(i => i.id === item.id)
+              if (!fullItem) return null
+              const isIntimate = fullItem.category === 'intimate'
               const canUse = !isIntimate || (intimatePhase !== 'idle')
               return (
                 <button key={item.id} onClick={() => {
                   if (!canUse) { setToast('亲密时才能使用'); return }
                   setShowBedside(false)
-                  if (item.category === 'ambiance') {
-                    const boost = parseInt(item.effect?.replace('romantic+','') || '10')
+                  if (fullItem.category === 'ambiance') {
+                    const boost = parseInt(fullItem.effect?.replace('romantic+','') || '10')
                     setRomantic(n => Math.min(100, n + boost))
-                    sendToAI(`她拿出了${item.name}（${item.desc}），营造氛围，你的反应`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
-                  } else if (item.hint) {
-                    sendToAI(item.hint, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                    sendToAI(`她拿出了${fullItem.name}（${fullItem.desc}），营造氛围，你的反应`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                  } else if (fullItem.hint) {
+                    sendToAI(fullItem.hint, messages, intimacy, playerRoom, luRoom, false, undefined, true)
                   }
-                  if (item.consumable) {
-                    setBedsideItems(prev => prev.filter(id => id !== item.id))
-                  }
+                  // 消耗一个 （数量减1）
+                  setBedsideItems(prev =>
+                    prev.map(i => {
+                      if (i.id === item.id) {
+                        const newQty = i.qty - 1
+                        return newQty > 0 ? { ...i, qty: newQty } : null
+                      }
+                      return i
+                    }).filter(Boolean)
+                  )
                   saveToDb(messages, intimacy, playerRoom, luRoom)
                 }} style={{
                   padding: '12px 14px', textAlign: 'left',
@@ -2423,13 +2391,18 @@ if (a.special === 'memories') return (
                   border: `1px solid ${isIntimate ? 'rgba(180,100,120,0.15)' : 'rgba(201,169,110,0.1)'}`,
                   borderRadius: '12px', cursor: canUse ? 'pointer' : 'default',
                   opacity: canUse ? 1 : 0.4,
-                  color: 'rgba(255,255,255,0.5)', fontFamily: 'Georgia, serif',
+                  color: 'var(--text-secondary, rgba(255,255,255,0.5))', fontFamily: 'Georgia, serif',
                 }}>
-                  <div style={{ fontSize: '13px', marginBottom: '3px', color: isIntimate ? 'rgba(200,130,150,0.8)' : 'rgba(201,169,110,0.7)' }}>
-                    {item.name}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', marginBottom: '3px', color: isIntimate ? 'rgba(200,130,150,0.8)' : 'rgba(201,169,110,0.7)' }}>
+                        {fullItem.name}
+                      </div>
+                      <div style={{ fontSize: '10px', opacity: 0.5 }}>{fullItem.desc}</div>
+                      {fullItem.consumable && <div style={{ fontSize: '9px', color: 'rgba(255,180,60,0.4)', marginTop: '2px' }}>· 消耗品</div>}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#c9a96e' }}>×{item.qty}</div>
                   </div>
-                  <div style={{ fontSize: '10px', opacity: 0.5 }}>{item.desc}</div>
-                  {item.consumable && <div style={{ fontSize: '9px', color: 'rgba(255,180,60,0.4)', marginTop: '2px' }}>· 消耗品</div>}
                 </button>
               )
             })}
@@ -2452,18 +2425,18 @@ if (a.special === 'memories') return (
   return (
     <div onClick={() => setShowShop(false)} style={{
       position: 'fixed', inset: 0, zIndex: 250,
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+      background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
       display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         width: '100%', maxWidth: '480px',
-        background: 'rgba(10,7,4,0.97)',
-        border: '1px solid rgba(201,169,110,0.12)',
+        background: 'var(--panel-bg, rgba(10,7,4,0.97))',
+        border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
         borderRadius: '20px 20px 0 0',
         padding: '20px 20px 44px', maxHeight: '70vh', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-          <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>🛍️ 商场</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-accent, #c9a96e)', letterSpacing: '0.1em' }}>🛍️ 商场</div>
           <div style={{ fontSize: '14px', color: '#ffd966' }}>💰 {coins}</div>
         </div>
 
@@ -2473,7 +2446,7 @@ if (a.special === 'memories') return (
             <button key={cat.id} onClick={() => setShopTab(cat.id)} style={{
               background: 'none', border: 'none',
               padding: '6px 12px', borderRadius: '20px',
-              color: shopTab === cat.id ? '#c9a96e' : 'rgba(255,255,255,0.3)',
+              color: shopTab === cat.id ? 'var(--text-accent, #c9a96e)' : 'rgba(255,255,255,0.3)',
               fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif',
               borderBottom: shopTab === cat.id ? '1px solid #c9a96e' : 'none',
             }}>
@@ -2512,16 +2485,22 @@ if (a.special === 'memories') return (
                       sendToAI(`她买了一件${item.name}（${item.desc}）给他，他还没有换上，一句话评价`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
                     }
                   } else if (item.shopType === 'bedside') {
-                    // 道具：加入床头柜
-                    setBedsideItems(prev => [...prev, item.id])
-                    sendToAI(`她买了${item.name}（${item.desc}），放进床头柜，他的反应，一句话`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
-                  }
+                      setBedsideItems(prev => {
+                        const existing = prev.find(i => i.id === item.id)
+                        if (existing) {
+                          return prev.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i)
+                        } else {
+                          return [...prev, { id: item.id, qty: 1 }]
+                        }
+                      })
+                      sendToAI(`她买了${item.name}（${item.desc}），放进床头柜，他的反应，一句话`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
+                    }
                   
                   saveToDb(messages, intimacy, playerRoom, luRoom)
                   setToast(`购买了 ${item.name}`)
                 }} style={{
                   padding: '12px 14px', textAlign: 'left',
-                  background: 'rgba(255,255,255,0.03)',
+                  background: 'var(--card-bg)',
                   border: '1px solid rgba(201,169,110,0.08)',
                   borderRadius: '12px', cursor: canAfford ? 'pointer' : 'default',
                   opacity: canAfford ? 1 : 0.5,
@@ -2581,24 +2560,58 @@ if (a.special === 'memories') return (
   const handleCheckout = () => {
     if (totalPrice > coins) { setToast('金币不足'); return }
     setCoins(prev => prev - totalPrice)
-    // 更新冰箱
-    setFridge(prev => {
-      const next = { ...prev }
-      cart.forEach(c => {
-        const item = SUPERMARKET_ITEMS.find(i => i.id === c.id)
-        if (item) {
-          const fridgeKey = {
-            rice: '米', noodle: '面条', egg: '鸡蛋', milk: '牛奶',
-            chicken: '鸡肉', pork: '猪肉', fish: '鱼', shrimp: '虾',
-            tomato: '番茄', lettuce: '青菜', potato: '土豆', mushroom: '蘑菇',
-            soy: '酱油', butter: '黄油', choco: '巧克力', cake: '蛋糕',
-            catfood: '猫粮', dogfood: '狗粮', pads: '卫生巾',
-          }[item.id] || item.name
-          next[fridgeKey] = (next[fridgeKey] || 0) + c.qty
-        }
-      })
-      return next
+    
+    // 分别处理冰箱和床头柜的物品
+    const fridgeAdditions = {}
+    const bedsideAdditions = {}  // { id: qty }
+    
+    cart.forEach(c => {
+      const item = SUPERMARKET_ITEMS.find(i => i.id === c.id)
+      if (!item) return
+      
+      if (item.bedsideOnly) {
+        // 床头柜物品：累加数量
+        bedsideAdditions[item.id] = (bedsideAdditions[item.id] || 0) + c.qty
+      } else {
+        // 普通食材：放入冰箱
+        const fridgeKey = {
+          rice: '米', noodle: '面条', egg: '鸡蛋', milk: '牛奶',
+          chicken: '鸡肉', pork: '猪肉', fish: '鱼', shrimp: '虾',
+          tomato: '番茄', lettuce: '青菜', potato: '土豆', mushroom: '蘑菇',
+          soy: '酱油', butter: '黄油', choco: '巧克力', cake: '蛋糕',
+          catfood: '猫粮', dogfood: '狗粮',
+        }[item.id] || item.name
+        fridgeAdditions[fridgeKey] = (fridgeAdditions[fridgeKey] || 0) + c.qty
+      }
     })
+    
+    // 更新冰箱
+    if (Object.keys(fridgeAdditions).length > 0) {
+      setFridge(prev => {
+        const next = { ...prev }
+        Object.entries(fridgeAdditions).forEach(([key, qty]) => {
+          next[key] = (next[key] || 0) + qty
+        })
+        return next
+      })
+    }
+    
+    // 更新床头柜（支持数量）
+    if (Object.keys(bedsideAdditions).length > 0) {
+      setBedsideItems(prev => {
+        const newList = [...prev]
+        Object.entries(bedsideAdditions).forEach(([id, qty]) => {
+          const existing = newList.find(i => i.id === id)
+          if (existing) {
+            existing.qty += qty
+          } else {
+            newList.push({ id, qty })
+          }
+        })
+        return newList
+      })
+    }
+    
     setCart([])
     setShowSupermarket(false)
     setToast('采购完成！')
@@ -2609,18 +2622,18 @@ if (a.special === 'memories') return (
   return (
     <div onClick={() => setShowSupermarket(false)} style={{
       position: 'fixed', inset: 0, zIndex: 250,
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+      background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
       display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         width: '100%', maxWidth: '480px',
-        background: 'rgba(10,7,4,0.97)',
-        border: '1px solid rgba(201,169,110,0.12)',
+        background: 'var(--panel-bg, rgba(10,7,4,0.97))',
+        border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
         borderRadius: '20px 20px 0 0',
         padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-          <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>🛒 超市</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-accent, #c9a96e)', letterSpacing: '0.1em' }}>🛒 超市</div>
           <div style={{ fontSize: '14px', color: '#ffd966' }}>💰 {coins}</div>
         </div>
 
@@ -2630,7 +2643,7 @@ if (a.special === 'memories') return (
             <button key={cat.id} onClick={() => setSuperTab(cat.id)} style={{
               background: 'none', border: 'none',
               padding: '5px 12px', borderRadius: '20px', whiteSpace: 'nowrap',
-              color: superTab === cat.id ? '#c9a96e' : 'rgba(255,255,255,0.3)',
+              color: superTab === cat.id ? 'var(--text-accent, #c9a96e)' : 'rgba(255,255,255,0.3)',
               fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia, serif',
             }}>
               {cat.label}
@@ -2646,7 +2659,7 @@ if (a.special === 'memories') return (
               <div key={item.id} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 padding: '10px 12px',
-                background: 'rgba(255,255,255,0.03)',
+                background: 'var(--card-bg)',
                 border: '1px solid rgba(201,169,110,0.08)',
                 borderRadius: '12px',
               }}>
@@ -2655,9 +2668,9 @@ if (a.special === 'memories') return (
                   <div style={{ fontSize: '10px', color: '#ffd966' }}>💰{item.price}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {qty > 0 && <button onClick={() => removeFromCart(item.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '18px', cursor: 'pointer' }}>-</button>}
-                  {qty > 0 && <span style={{ fontSize: '14px', color: '#c9a96e' }}>{qty}</span>}
-                  <button onClick={() => addToCart(item)} style={{ background: 'none', border: 'none', color: '#c9a96e', fontSize: '18px', cursor: 'pointer' }}>+</button>
+                  {qty > 0 && <button onClick={() => removeFromCart(item.id)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary, rgba(255,255,255,0.5))', fontSize: '18px', cursor: 'pointer' }}>-</button>}
+                  {qty > 0 && <span style={{ fontSize: '14px', color: 'var(--text-accent, #c9a96e)' }}>{qty}</span>}
+                  <button onClick={() => addToCart(item)} style={{ background: 'none', border: 'none', color: 'var(--text-accent, #c9a96e)', fontSize: '18px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
             )
@@ -2672,17 +2685,17 @@ if (a.special === 'memories') return (
           }}>
             <div style={{ fontSize: '11px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>购物车</div>
             {cart.map(c => (
-              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>
+              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary, rgba(255,255,255,0.5))', marginBottom: '4px' }}>
                 <span>{c.name} x{c.qty}</span>
                 <span>💰{c.price * c.qty}</span>
               </div>
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-              <span style={{ fontSize: '12px', color: '#c9a96e' }}>总计: 💰{totalPrice}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-accent, #c9a96e)' }}>总计: 💰{totalPrice}</span>
               <button onClick={handleCheckout} style={{
                 padding: '6px 20px', background: 'rgba(201,169,110,0.15)',
                 border: '1px solid rgba(201,169,110,0.3)', borderRadius: '20px',
-                color: '#c9a96e', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif',
+                color: 'var(--text-accent, #c9a96e)', fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif',
               }}>结算</button>
             </div>
           </div>
@@ -2696,20 +2709,20 @@ if (a.special === 'memories') return (
 {showPetPanel && (
   <div onClick={() => { setShowPetPanel(false); setShowAdopt(false) }} style={{
     position: 'fixed', inset: 0, zIndex: 250,
-    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
     display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
   }}>
     <div onClick={e => e.stopPropagation()} style={{
       width: '100%', maxWidth: '480px',
-      background: 'rgba(10,7,4,0.97)',
-      border: '1px solid rgba(201,169,110,0.12)',
+      background: 'var(--panel-bg, rgba(10,7,4,0.97))',
+      border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
       borderRadius: '20px 20px 0 0',
       padding: '20px 20px 44px',
     }}>
       {!pet ? (
         // 领养界面
         <>
-          <div style={{ fontSize: '13px', color: '#c9a96e', marginBottom: '14px', textAlign: 'center' }}>🐾 领养宠物</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-accent, #c9a96e)', marginBottom: '14px', textAlign: 'center' }}>🐾 领养宠物</div>
           <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginBottom: '20px' }}>
             {PETS.map(p => (
               <button key={p.id} onClick={() => setAdoptingType(p.id)} style={{
@@ -2718,7 +2731,7 @@ if (a.special === 'memories') return (
                 borderRadius: '16px', padding: '16px', cursor: 'pointer', textAlign: 'center',
               }}>
                 <div style={{ fontSize: '48px' }}>{p.emoji}</div>
-                <div style={{ fontSize: '14px', color: '#c9a96e', marginTop: '8px' }}>{p.name}</div>
+                <div style={{ fontSize: '14px', color: 'var(--text-accent, #c9a96e)', marginTop: '8px' }}>{p.name}</div>
               </button>
             ))}
           </div>
@@ -2730,8 +2743,8 @@ if (a.special === 'memories') return (
                 placeholder="给宠物起个名字"
                 style={{
                   width: '100%', padding: '10px 14px', marginBottom: '12px',
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(201,169,110,0.15)',
-                  borderRadius: '12px', color: '#e8dcc8', fontSize: '13px', outline: 'none',
+                  background: 'var(--card-bg-hover)', border: '1px solid rgba(201,169,110,0.15)',
+                  borderRadius: '12px', color: 'var(--text-primary, #e8dcc8)', fontSize: '13px', outline: 'none',
                   fontFamily: 'Georgia, serif',
                 }}
               />
@@ -2745,8 +2758,8 @@ if (a.special === 'memories') return (
                 saveToDb(messages, intimacy, playerRoom, luRoom)
               }} style={{
                 width: '100%', padding: '12px',
-                background: 'rgba(201,169,110,0.12)', border: '1px solid rgba(201,169,110,0.25)',
-                borderRadius: '12px', color: '#c9a96e', fontSize: '13px', cursor: 'pointer',
+                background: 'var(--border-glass)', border: '1px solid rgba(201,169,110,0.25)',
+                borderRadius: '12px', color: 'var(--text-accent, #c9a96e)', fontSize: '13px', cursor: 'pointer',
                 fontFamily: 'Georgia, serif',
               }}>确认领养</button>
             </>
@@ -2757,26 +2770,26 @@ if (a.special === 'memories') return (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div style={{ fontSize: '24px' }}>{PETS.find(p => p.id === pet.typeId)?.emoji}</div>
-            <div style={{ fontSize: '16px', color: '#c9a96e' }}>{pet.name}</div>
-            <button onClick={() => setShowPetPanel(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+            <div style={{ fontSize: '16px', color: 'var(--text-accent, #c9a96e)' }}>{pet.name}</div>
+            <button onClick={() => setShowPetPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary, rgba(255,255,255,0.3))', fontSize: '18px', cursor: 'pointer' }}>✕</button>
           </div>
           
           <div style={{ marginBottom: '12px' }}>
             <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '4px' }}>饥饿</div>
-            <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pet.hunger}%`, background: pet.hunger < 30 ? '#e08030' : '#c9a96e', borderRadius: '4px' }} />
+            <div style={{ height: '4px', background: 'var(--room-btn-bg)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pet.hunger}%`, background: pet.hunger < 30 ? '#e08030' : 'var(--text-accent, #c9a96e)', borderRadius: '4px' }} />
             </div>
           </div>
           <div style={{ marginBottom: '12px' }}>
             <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '4px' }}>清洁</div>
-            <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pet.clean}%`, background: pet.clean < 30 ? '#e08030' : '#c9a96e', borderRadius: '4px' }} />
+            <div style={{ height: '4px', background: 'var(--room-btn-bg)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pet.clean}%`, background: pet.clean < 30 ? '#e08030' : 'var(--text-accent, #c9a96e)', borderRadius: '4px' }} />
             </div>
           </div>
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '4px' }}>心情</div>
-            <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pet.mood}%`, background: pet.mood < 30 ? '#e08030' : '#c9a96e', borderRadius: '4px' }} />
+            <div style={{ height: '4px', background: 'var(--room-btn-bg)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pet.mood}%`, background: pet.mood < 30 ? '#e08030' : 'var(--text-accent, #c9a96e)', borderRadius: '4px' }} />
             </div>
           </div>
 
@@ -2791,14 +2804,14 @@ if (a.special === 'memories') return (
               setPet(feedPet(pet))
               setToast(`喂了${pet.name}`)
               saveToDb(messages, intimacy, playerRoom, luRoom)
-            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer' }}>
+            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'var(--text-secondary, rgba(201,169,110,0.7))', fontSize: '12px', cursor: 'pointer' }}>
               🍖 喂食
             </button>
             <button onClick={() => {
               setPet(bathePet(pet))
               setToast(`给${pet.name}洗了澡`)
               saveToDb(messages, intimacy, playerRoom, luRoom)
-            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer' }}>
+            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'var(--text-secondary, rgba(201,169,110,0.7))', fontSize: '12px', cursor: 'pointer' }}>
               🧼 洗澡
             </button>
             <button onClick={() => {
@@ -2806,12 +2819,12 @@ if (a.special === 'memories') return (
               setToast(`撸了${pet.name}`)
               sendToAI(`她摸了摸${pet.name}，你的反应，一句话`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
               saveToDb(messages, intimacy, playerRoom, luRoom)
-            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer' }}>
+            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'var(--text-secondary, rgba(201,169,110,0.7))', fontSize: '12px', cursor: 'pointer' }}>
               🫳 撸它
             </button>
             <button onClick={() => {
               sendToAI(`她叫${pet.name}过来，他的反应`, messages, intimacy, playerRoom, luRoom, false, undefined, true)
-            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'rgba(201,169,110,0.7)', fontSize: '12px', cursor: 'pointer' }}>
+            }} style={{ padding: '6px 14px', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.15)', borderRadius: '20px', color: 'var(--text-secondary, rgba(201,169,110,0.7))', fontSize: '12px', cursor: 'pointer' }}>
               🗣️ 叫他过来
             </button>
           </div>
@@ -2835,19 +2848,19 @@ if (a.special === 'memories') return (
             {showGarden && (
               <div onClick={() => setShowGarden(false)} style={{
                 position: 'fixed', inset: 0, zIndex: 250,
-                background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+                background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
                 display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
               }}>
                 <div onClick={e => e.stopPropagation()} style={{
                   width: '100%', maxWidth: '480px',
-                  background: 'rgba(10,7,4,0.97)',
-                  border: '1px solid rgba(201,169,110,0.12)',
+                  background: 'var(--panel-bg, rgba(10,7,4,0.97))',
+                  border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
                   borderRadius: '20px 20px 0 0',
                   padding: '20px 20px 44px', maxHeight: '75vh', overflowY: 'auto',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                    <div style={{ fontSize: '13px', color: '#c9a96e', letterSpacing: '0.1em' }}>🌱 阳台花园</div>
-                    <button onClick={() => setShowGarden(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+                    <div style={{ fontSize: '13px', color: 'var(--text-accent, #c9a96e)', letterSpacing: '0.1em' }}>🌱 阳台花园</div>
+                    <button onClick={() => setShowGarden(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary, rgba(255,255,255,0.3))', fontSize: '18px', cursor: 'pointer' }}>✕</button>
                   </div>
 
                   {/* 花盆列表 */}
@@ -2869,11 +2882,11 @@ if (a.special === 'memories') return (
                       return (
                         <div key={i} style={{
                           padding: '12px', textAlign: 'center',
-                          background: 'rgba(201,169,110,0.04)', border: '1px solid rgba(201,169,110,0.12)',
+                          background: 'rgba(201,169,110,0.04)', border: '1px solid var(--border-glass, rgba(201,169,110,0.12))',
                           borderRadius: '12px',
                         }}>
                           <div style={{ fontSize: '28px', marginBottom: '4px' }}>{display.emoji}</div>
-                          <div style={{ fontSize: '12px', color: '#c9a96e', marginBottom: '2px' }}>{display.name}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-accent, #c9a96e)', marginBottom: '2px' }}>{display.name}</div>
                           <div style={{ fontSize: '10px', color: 'rgba(201,169,110,0.4)', marginBottom: '8px' }}>{display.label}</div>
                           <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                             {display.needsWater && (
@@ -2901,7 +2914,7 @@ if (a.special === 'memories') return (
                               }} style={{
                                 padding: '3px 10px', fontSize: '10px', background: 'rgba(201,169,110,0.1)',
                                 border: '1px solid rgba(201,169,110,0.2)', borderRadius: '14px',
-                                color: '#c9a96e', cursor: 'pointer', fontFamily: 'Georgia, serif',
+                                color: 'var(--text-accent, #c9a96e)', cursor: 'pointer', fontFamily: 'Georgia, serif',
                               }}>🌾收获</button>
                             )}
                             <button onClick={() => {
@@ -2935,11 +2948,11 @@ if (a.special === 'memories') return (
                             saveToDb(messages, intimacy, playerRoom, luRoom)
                           }} style={{
                             padding: '8px 12px', textAlign: 'center',
-                            background: 'rgba(255,255,255,0.03)',
-                            border: '1px solid rgba(201,169,110,0.1)', borderRadius: '10px',
+                            background: 'var(--card-bg)',
+                            border: '1px solid var(--border-glass, rgba(201,169,110,0.1))', borderRadius: '10px',
                             cursor: coins >= p.price ? 'pointer' : 'default',
                             opacity: coins >= p.price ? 1 : 0.4,
-                            color: 'rgba(255,255,255,0.5)', fontFamily: 'Georgia, serif',
+                            color: 'var(--text-secondary, rgba(255,255,255,0.5))', fontFamily: 'Georgia, serif',
                           }}>
                             <div style={{ fontSize: '20px' }}>{p.emoji}</div>
                             <div style={{ fontSize: '11px', marginTop: '2px' }}>{p.name}</div>
@@ -2952,20 +2965,42 @@ if (a.special === 'memories') return (
                 </div>
               </div>
             )}
-      <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} />
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed', bottom: '90px', left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(12,8,4,0.94)', border: '1px solid rgba(201,169,110,0.15)',
-          color: 'rgba(201,169,110,0.7)', fontSize: '11px', padding: '8px 20px',
-          borderRadius: '20px', letterSpacing: '0.1em', zIndex: 300,
-          whiteSpace: 'nowrap', backdropFilter: 'blur(8px)', isolation: 'isolate'
-        }}>{toast}</div>
-      )}
+        <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} />
+        <ContactModal show={showContact} onClose={() => setShowContact(false)} />
+        <SideMenu
+          show={showMenu}
+          onClose={handleCloseMenu}
+          onSettings={() => setShowSettings(true)}
+          onLogout={handleLogout}
+          onMemories={handleOpenMemories}
+          onGarden={handleOpenGarden}
+          onPet={handleOpenPet}
+          onFridge={handleOpenFridge}
+          onWardrobe={handleOpenWardrobe}
+          onShop={handleOpenShop}
+          onCalendar={handleOpenCalendar}
+          onChangeAvatar={handleChangeAvatar}
+          onContact={handleContact}
+          intimacy={intimacy}
+          characterName={CHARACTER_CONFIG.name}
+          intimacyLevel={getIntimacyLevel(intimacy).level}
+          intimacyStage={getIntimacyLevel(intimacy).stage}
+          daysTogether={daysTogether}
+          avatarUrl={CHARACTER_CONFIG.images?.default}
+        />
+        {/* Toast */}
+        {toast && (
+          <div style={{
+            position: 'fixed', bottom: '90px', left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(12,8,4,0.94)', border: '1px solid rgba(201,169,110,0.15)',
+            color: 'var(--text-secondary, rgba(201,169,110,0.7))', fontSize: '11px', padding: '8px 20px',
+            borderRadius: '20px', letterSpacing: '0.1em', zIndex: 300,
+            whiteSpace: 'nowrap', backdropFilter: 'blur(8px)', isolation: 'isolate'
+          }}>{toast}</div>
+        )}
 
-    </div>
+        </div>      
       </div>
     </>
   )
