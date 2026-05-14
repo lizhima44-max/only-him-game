@@ -12,8 +12,11 @@ export default function SideMenu({
   onFridge,
   onWardrobe,
   onShop,
+  onSupermarket,
+  onBedside,
   onCalendar,
   onChangeAvatar,
+  onFavorites,    // 👈 检查这一行有没有
   onContact,
   intimacy,
   characterName,
@@ -59,8 +62,8 @@ export default function SideMenu({
           </div>
           <div className="user-details">
             <div className="user-name">{characterName}</div>
-            <div className="user-level">{intimacyLevel} · {intimacyStage}({intimacy})</div>
-            <div className="user-days">📅 相伴 {daysTogether}天</div>
+            <div className="user-level">{intimacyLevel} · {intimacyStage} ({intimacy})/100</div>
+            <div className="user-days"> 相伴 {daysTogether}天</div>
             <button className="edit-profile" onClick={onChangeAvatar}>✎ 编辑</button>
           </div>
         </div>
@@ -70,12 +73,7 @@ export default function SideMenu({
         <div className="menu-section">主要功能</div>
         <button className="menu-item" onClick={onSettings}><span>⚙️</span> AI模型设置</button>
         <button className="menu-item" onClick={onMemories}><span>📖</span> 重要回忆</button>
-        <button className="menu-item" onClick={() => alert('我的记忆 开发中')}><span>📝</span> 我的记忆</button>
-        <button className="menu-item" onClick={onGarden}><span>🌸</span> 花园</button>
-        <button className="menu-item" onClick={onPet}><span>🐱</span> 宠物</button>
-        <button className="menu-item" onClick={onFridge}><span>🧊</span> 冰箱</button>
-        <button className="menu-item" onClick={onWardrobe}><span>👔</span> 衣帽间</button>
-        {/* 商场按钮已移除，因为它在外出场景中已经存在 */}
+        <button className="menu-item" onClick={onFavorites}><span>📝</span> 我的收藏</button>
         <button className="menu-item" onClick={onCalendar}><span>🩸</span> 生理期日历</button>
 
         <div className="menu-divider" />
@@ -87,7 +85,6 @@ export default function SideMenu({
         <div className="menu-divider" />
 
         <div className="menu-section">其他</div>
-        <button className="menu-item" onClick={() => alert('Lovense联动预留')}><span>💗</span> Lovense联动</button>
         <button className="menu-item" onClick={onContact}><span>📧</span> 联系我们</button>
         <button className="menu-item" onClick={onLogout}><span>🚪</span> 退出登录</button>
       </div>

@@ -1,4 +1,6 @@
 // components/TopBar.js
+import { useState } from 'react'
+
 export default function TopBar({ 
   characterName, 
   intimacy, 
@@ -7,25 +9,47 @@ export default function TopBar({
   onToggleLocation, 
   onMenuClick,
   avatarUrl,
-  intimacyLevel,      // 新增：好感度等级，如 "Lv.5"
-  intimacyStage,      // 新增：阶段名，如 "热恋期"
-  daysTogether        // 新增：陪伴天数
+  intimacyStage,
+  daysTogether,
+  romantic,
+  onRomanticClick     // 新增：点击浪漫值时调用的函数
 }) {
+  // 根据浪漫值返回文案
+  const getRomanticText = (value) => {
+    if (value >= 81) return '🔥 今夜难眠'
+    if (value >= 51) return '💕 暧昧升温'
+    if (value >= 21) return '🌸 有点心动'
+    return '🍃 平平淡淡'
+  }
+
   return (
     <div className="top-bar">
       <div className="top-bar-left">
         {avatarUrl && <img src={avatarUrl} alt="头像" className="avatar-small" />}
         <div className="character-name">{characterName}</div>
         <div className="intimacy-level">
-          {intimacyLevel} · {intimacyStage}
+          {intimacyStage}
         </div>
         <div className="days-together">
-          📅 相伴 {daysTogether}天
+           相伴 {daysTogether}天
         </div>
         <div className="coins">💰{coins}</div>
       </div>
       <div className="top-bar-right">
-        {/* 位置切换按钮和菜单按钮保持不变 */}
+        {/* 浪漫值 - 点击显示氛围文案 */}
+        <div 
+          className="romantic-value"
+          onClick={() => onRomanticClick && onRomanticClick(getRomanticText(romantic))}
+          style={{ 
+            fontSize: '11px', 
+            color: '#ffb8c5', 
+            marginRight: '8px',
+            cursor: 'pointer'
+          }}
+        >
+          ❤️ {romantic}
+        </div>
+
         <button className="location-toggle" onClick={onToggleLocation}>
           <span className="toggle-icon">{locationState === 'home' ? '🏠' : '🏠'}</span>
           <span className="toggle-text">{locationState === 'home' ? '在家里' : '回家吧'}</span>

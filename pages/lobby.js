@@ -689,6 +689,7 @@ export default function Lobby() {
             userId={userId}
             onClose={() => { setShowCreator(false); loadCustomChars() }}
             onComplete={() => { setShowCreator(false); loadCustomChars() }}
+            theme={theme}  // ← 添加这一行
           />
 
         </div>
